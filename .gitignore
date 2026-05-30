@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+web thi online/node_modules/
+
+# env
+.env
+web thi online/.env
+
+# vscode
+.vscode/
+
+# build
+dist/
+build/
+
+# logs
+*.log
