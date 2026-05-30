@@ -21,14 +21,12 @@ Ví dụ:
   "answer3": "5",
   "answer4": "6",
   "correct": "1",
-  "teacher_id": 1
 }
 
 DELETE http://localhost:3001/teacher/deleteQuestion  : Xoá bài tập theo mã bài tập và mã giảng viên
 Ví dụ: 
 {
-  "id": 5,
-  "teacher_id": 1
+  "id": 5
 }
 
 POST http://localhost:3001/teacher/createExam : Thêm đề thi
@@ -36,7 +34,6 @@ Ví dụ:
 {
   "title": "Math Test",
   "duration": 60,
-  "teacher_id": 1,
   "start_time": "2026-05-28T08:00:00",
   "end_time": "2026-05-28T10:00:00",
   "question_ids": [2, 3, 6]
@@ -45,6 +42,5 @@ Ví dụ:
 DELETE http://localhost:3001/teacher/deleteExam : Xoá đề thi theo mã bài tập và mã giảng viên
 Ví dụ:
 {
-  "id": 2,
-  "teacher_id": 1
+  "id": 2
 }

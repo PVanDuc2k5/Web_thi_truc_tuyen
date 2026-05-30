@@ -16,6 +16,7 @@ export class TeacherService {
 
     constructor(private readonly jwtService: JwtService) {}
 
+    // Lấy teacher_id từ token
     private getTeacherIdFromToken(req: any) {
         const authHeader = req.headers.authorization;
 
