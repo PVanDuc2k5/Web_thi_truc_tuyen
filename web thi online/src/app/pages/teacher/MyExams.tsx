@@ -279,7 +279,11 @@ export default function MyExams() {
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Edit">
-                      <IconButton color="primary" size="small">
+                      <IconButton
+                        color="primary"
+                        size="small"
+                        onClick={() => navigate(`/teacher/exam/${exam.id}`)}
+                      >
                         <Edit />
                       </IconButton>
                     </Tooltip>

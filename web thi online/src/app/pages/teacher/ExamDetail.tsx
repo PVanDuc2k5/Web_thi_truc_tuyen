@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import {
   Box,
@@ -17,6 +18,11 @@ import {
   Divider,
   IconButton,
   Tooltip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
 } from '@mui/material';
 import { ArrowBack, Edit, People, QuestionAnswer, Schedule, CheckCircle, ContentCopy, VpnKey } from '@mui/icons-material';
 import { toast } from 'sonner';
@@ -57,10 +63,36 @@ const stats = [
 export default function ExamDetail() {
   const { examId } = useParams();
   const navigate = useNavigate();
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: examData.title,
+    duration: String(examData.duration),
+    startTime: examData.startTime,
+    endTime: examData.endTime,
+    maxAttempts: String(examData.maxAttempts),
+    description: examData.description,
+  });
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(examData.examCode);
     toast.success('Exam code copied to clipboard!');
+  };
+
+  const handleOpenEdit = () => {
+    setEditForm({
+      title: examData.title,
+      duration: String(examData.duration),
+      startTime: examData.startTime,
+      endTime: examData.endTime,
+      maxAttempts: String(examData.maxAttempts),
+      description: examData.description,
+    });
+    setEditOpen(true);
+  };
+
+  const handleSaveExam = () => {
+    setEditOpen(false);
+    toast.success('Exam changes saved locally.');
   };
 
   return (
@@ -130,6 +162,7 @@ export default function ExamDetail() {
               variant="contained"
               startIcon={<Edit />}
               size="small"
+              onClick={handleOpenEdit}
               sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
             >
               Edit Exam
@@ -215,6 +248,64 @@ export default function ExamDetail() {
           </Grid>
         </CardContent>
       </Card>
+
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Edit Exam</DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <TextField
+            fullWidth
+            label="Exam Title"
+            margin="normal"
+            value={editForm.title}
+            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+          />
+          <TextField
+            fullWidth
+            label="Description"
+            margin="normal"
+            multiline
+            minRows={3}
+            value={editForm.description}
+            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+          />
+          <TextField
+            fullWidth
+            label="Duration (minutes)"
+            type="number"
+            margin="normal"
+            value={editForm.duration}
+            onChange={(e) => setEditForm({ ...editForm, duration: e.target.value })}
+          />
+          <TextField
+            fullWidth
+            label="Start Time"
+            margin="normal"
+            value={editForm.startTime}
+            onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
+          />
+          <TextField
+            fullWidth
+            label="End Time"
+            margin="normal"
+            value={editForm.endTime}
+            onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
+          />
+          <TextField
+            fullWidth
+            label="Max Attempts"
+            type="number"
+            margin="normal"
+            value={editForm.maxAttempts}
+            onChange={(e) => setEditForm({ ...editForm, maxAttempts: e.target.value })}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveExam}>
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Card elevation={2}>
         <CardContent>
