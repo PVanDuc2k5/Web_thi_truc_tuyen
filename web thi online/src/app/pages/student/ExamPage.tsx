@@ -1,60 +1,63 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
-  Box,
-  Typography,
-  Paper,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
-  Button,
-  LinearProgress,
-  Card,
-  CardContent,
+  Box, Typography, Paper, RadioGroup, FormControlLabel, Radio,
+  Button, LinearProgress, Card, CardContent, CircularProgress
 } from '@mui/material';
 import { NavigateBefore, NavigateNext, Send } from '@mui/icons-material';
 
-const mockQuestions = [
-  {
-    id: 1,
-    question: 'What is 2 + 2?',
-    options: ['3', '4', '5', '6'],
-  },
-  {
-    id: 2,
-    question: 'What is the capital of France?',
-    options: ['London', 'Berlin', 'Paris', 'Madrid'],
-  },
-  {
-    id: 3,
-    question: 'Which planet is closest to the sun?',
-    options: ['Venus', 'Mercury', 'Earth', 'Mars'],
-  },
-  {
-    id: 4,
-    question: 'Who wrote Romeo and Juliet?',
-    options: ['Charles Dickens', 'William Shakespeare', 'Jane Austen', 'Mark Twain'],
-  },
-  {
-    id: 5,
-    question: 'What is the largest ocean on Earth?',
-    options: ['Atlantic', 'Indian', 'Arctic', 'Pacific'],
-  },
-];
+// Định nghĩa Types chuẩn với Backend
+interface Answer { id: number; content: string; }
+interface Question { id: number; content: string; answers: Answer[]; }
+interface Exam { id: number; title: string; duration: number; }
 
 export default function ExamPage() {
   const navigate = useNavigate();
   const { examId } = useParams();
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<{ [key: number]: string }>({});
-  const [timeLeft, setTimeLeft] = useState(3600);
 
+  // State quản lý Data từ API
+  const [exam, setExam] = useState<Exam | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // State quản lý luồng thi
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [answers, setAnswers] = useState<{ [key: number]: number }>({});
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [result, setResult] = useState<{ score: number, correctCount: number, totalQuestions: number } | null>(null);
+
+  // Lấy dữ liệu bài thi khi mở trang
   useEffect(() => {
+    const fetchExamData = async () => {
+      try {
+        const id = examId || "1"; // Ưu tiên URL, nếu không có thì test tạm bài 1
+        const response = await fetch(`http://localhost:3001/student/exam/${id}`);
+        if (!response.ok) throw new Error('Không tìm thấy đề thi (DB trống)');
+        
+        const data = await response.json();
+        setExam(data.exam);
+        setQuestions(data.questions);
+        setTimeLeft(data.exam.duration * 60); // Đổi phút ra giây cho đồng hồ
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchExamData();
+  }, [examId]);
+
+  // Logic Đồng hồ đếm ngược
+  useEffect(() => {
+    if (loading || timeLeft <= 0 || result || isSubmitting) return;
+
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          handleSubmit();
+          handleSubmit(); // Hết giờ tự động nộp
           return 0;
         }
         return prev - 1;
@@ -62,10 +65,44 @@ export default function ExamPage() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [loading, result, isSubmitting]); // Bỏ qua dependency timeLeft để tránh re-render liên tục
 
-  const handleSubmit = () => {
-    navigate(`/student/result/${examId}`);
+  // Hàm Nộp bài gọi API Backend
+  const handleSubmit = async () => {
+    if (!exam || isSubmitting) return;
+    
+    // Nếu còn thời gian thì hỏi lại, hết giờ thì ép nộp luôn
+    if (timeLeft > 0) {
+      const isConfirm = window.confirm('Bạn có chắc chắn muốn nộp bài?');
+      if (!isConfirm) return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const answersPayload = Object.entries(answers).map(([qId, aId]) => ({
+        questionId: Number(qId),
+        answerId: Number(aId)
+      }));
+
+      const payload = {
+        userId: 1, // Fix cứng ID sinh viên tạm thời
+        examId: exam.id,
+        answers: answersPayload
+      };
+
+      const response = await fetch('http://localhost:3001/student/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error('Lỗi chấm điểm');
+      const data = await response.json();
+      setResult(data);
+    } catch (error) {
+      alert('Có lỗi xảy ra khi nộp bài!');
+      setIsSubmitting(false);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -74,98 +111,125 @@ export default function ExamPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progress = ((currentQuestion + 1) / mockQuestions.length) * 100;
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress style={{color: 'rgb(22, 119, 185)'}} /></Box>;
+  if (error) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'error.main', typography: 'h6' }}>{error}</Box>;
+  if (questions.length === 0) return <Box sx={{ p: 4, textAlign: 'center' }}>Chưa có câu hỏi nào trong đề này.</Box>;
+
+  // MÀN HÌNH KẾT QUẢ
+  if (result) {
+    return (
+      <Box sx={{ maxWidth: 600, mx: 'auto', mt: 8, p: 4, textAlign: 'center', bgcolor: 'white', borderRadius: 2, boxShadow: 3, border: '1px solid #e0e0e0' }}>
+        <Typography variant="h3" fontWeight={700} sx={{ color: 'rgb(22, 119, 185)', fontFamily: "'Palatino Linotype', Palatino, serif", mb: 3 }}>
+          Hoàn thành bài thi!
+        </Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Số câu đúng: <strong>{result.correctCount} / {result.totalQuestions}</strong>
+        </Typography>
+        <Typography variant="body1" color="text.secondary">Điểm tổng kết:</Typography>
+        <Typography variant="h1" fontWeight={900} sx={{ color: 'rgb(22, 119, 185)', mt: 1 }}>
+          {result.score}
+        </Typography>
+      </Box>
+    );
+  }
+
+  // MÀN HÌNH LÀM BÀI
+  const progress = ((currentQuestion + 1) / questions.length) * 100;
+  const currentQ = questions[currentQuestion];
 
   return (
-    <Box>
-      <Card elevation={3} sx={{ mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+    <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
+      {/* Header Đếm ngược */}
+      <Card elevation={3} sx={{ mb: 3, backgroundColor: 'rgb(22, 119, 185)', color: 'white' }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>
-              <Typography variant="h5" fontWeight={600}>
-                Exam in Progress
+              <Typography variant="h5" fontWeight={700} sx={{ fontFamily: "'Palatino Linotype', Palatino, serif" }}>
+                {exam?.title}
               </Typography>
               <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-                Question {currentQuestion + 1} of {mockQuestions.length}
+                Câu hỏi {currentQuestion + 1} / {questions.length}
               </Typography>
             </Box>
-            <Box sx={{ textAlign: 'right', bgcolor: 'rgba(255,255,255,0.2)', px: 3, py: 2, borderRadius: 2 }}>
-              <Typography variant="h3" fontWeight={700} sx={{ fontFamily: 'monospace' }}>
+            <Box sx={{ textAlign: 'right', bgcolor: 'rgba(255,255,255,0.15)', px: 3, py: 1.5, borderRadius: 2 }}>
+              <Typography variant="h4" fontWeight={700} sx={{ fontFamily: 'monospace' }}>
                 {formatTime(timeLeft)}
               </Typography>
-              <Typography variant="body2" sx={{ mt: 0.5 }}>Time Remaining</Typography>
+              <Typography variant="caption" sx={{ mt: 0.5 }}>Thời gian còn lại</Typography>
             </Box>
           </Box>
         </CardContent>
       </Card>
 
-      <Paper elevation={2} sx={{ p: 4, minHeight: '60vh' }}>
+      {/* Vùng câu hỏi */}
+      <Paper elevation={2} sx={{ p: 4, minHeight: '55vh', display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ mb: 4 }}>
-          <LinearProgress variant="determinate" value={progress} sx={{ height: 8, borderRadius: 4, mb: 1 }} />
-          <Typography variant="body2" color="text.secondary">
-            Progress: {currentQuestion + 1}/{mockQuestions.length}
-          </Typography>
+          <LinearProgress variant="determinate" value={progress} sx={{ height: 8, borderRadius: 4, mb: 1, '& .MuiLinearProgress-bar': { backgroundColor: 'rgb(22, 119, 185)' } }} />
         </Box>
 
-        <Box sx={{ mb: 4, p: 3, bgcolor: '#f8f9fa', borderRadius: 2, borderLeft: '4px solid #667eea' }}>
-          <Typography variant="h5" fontWeight={600}>
-            {mockQuestions[currentQuestion].question}
+        <Box sx={{ mb: 4, p: 3, bgcolor: '#f8f9fa', borderRadius: 2, borderLeft: '4px solid rgb(22, 119, 185)' }}>
+          <Typography variant="h6" fontWeight={600} sx={{ fontFamily: "'Palatino Linotype', Palatino, serif" }}>
+            {currentQ.content}
           </Typography>
         </Box>
 
         <RadioGroup
-          value={answers[currentQuestion] || ''}
-          onChange={(e) => setAnswers({ ...answers, [currentQuestion]: e.target.value })}
+          value={answers[currentQ.id]?.toString() || ''}
+          onChange={(e) => setAnswers({ ...answers, [currentQ.id]: Number(e.target.value) })}
+          sx={{ flexGrow: 1 }}
         >
-          {mockQuestions[currentQuestion].options.map((option, idx) => (
+          {currentQ.answers.map((ans) => (
             <Paper
-              key={idx}
+              key={ans.id}
               variant="outlined"
               sx={{
-                mb: 2,
-                p: 2,
-                cursor: 'pointer',
-                '&:hover': { bgcolor: '#f5f5f5' },
-                bgcolor: answers[currentQuestion] === option ? '#e8eaf6' : 'transparent',
+                mb: 2, p: 1.5, cursor: 'pointer', transition: 'all 0.2s',
+                '&:hover': { bgcolor: '#f0f7fb', borderColor: 'rgb(22, 119, 185)' },
+                bgcolor: answers[currentQ.id] === ans.id ? '#e3f2fd' : 'transparent',
+                borderColor: answers[currentQ.id] === ans.id ? 'rgb(22, 119, 185)' : '#e0e0e0',
               }}
+              onClick={() => setAnswers({ ...answers, [currentQ.id]: ans.id })}
             >
               <FormControlLabel
-                value={option}
-                control={<Radio />}
-                label={option}
+                value={ans.id.toString()}
+                control={<Radio sx={{ color: 'rgb(22, 119, 185)', '&.Mui-checked': { color: 'rgb(22, 119, 185)' } }} />}
+                label={<Typography sx={{ fontWeight: 500 }}>{ans.content}</Typography>}
                 sx={{ width: '100%', m: 0 }}
               />
             </Paper>
           ))}
         </RadioGroup>
 
+        {/* Nút điều hướng */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
           <Button
             variant="outlined"
             startIcon={<NavigateBefore />}
             disabled={currentQuestion === 0}
             onClick={() => setCurrentQuestion(currentQuestion - 1)}
+            sx={{ color: 'rgb(22, 119, 185)', borderColor: 'rgb(22, 119, 185)', '&:hover': { borderColor: 'rgb(18, 95, 148)', bgcolor: 'rgba(22, 119, 185, 0.04)' } }}
           >
-            Previous
+            Câu trước
           </Button>
 
-          {currentQuestion === mockQuestions.length - 1 ? (
+          {currentQuestion === questions.length - 1 ? (
             <Button
               variant="contained"
               endIcon={<Send />}
               onClick={handleSubmit}
-              sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+              disabled={isSubmitting}
+              sx={{ backgroundColor: 'rgb(22, 119, 185)', '&:hover': { backgroundColor: 'rgb(18, 95, 148)' } }}
             >
-              Submit Exam
+              {isSubmitting ? 'Đang chấm...' : 'Nộp Bài'}
             </Button>
           ) : (
             <Button
               variant="contained"
               endIcon={<NavigateNext />}
               onClick={() => setCurrentQuestion(currentQuestion + 1)}
-              sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+              sx={{ backgroundColor: 'rgb(22, 119, 185)', '&:hover': { backgroundColor: 'rgb(18, 95, 148)' } }}
             >
-              Next
+              Câu tiếp
             </Button>
           )}
         </Box>
