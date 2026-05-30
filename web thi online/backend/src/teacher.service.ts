@@ -1,15 +1,60 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+    Injectable,
+    BadRequestException,
+    UnauthorizedException,
+    ForbiddenException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { createClient } from '@supabase/supabase-js';
 
 @Injectable()
 export class TeacherService {
-  private supabase = createClient(
-    process.env.SUPABASE_URL as string,
-    process.env.SUPABASE_SERVICE_ROLE_KEY as string,
-  );
-    //Tạo câu hỏi
-    async createQuestion(body: any) {
-        const { question, answer1, answer2, answer3, answer4, correct, teacher_id } = body;
+    private supabase = createClient(
+        process.env.SUPABASE_URL as string,
+        process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+    );
+
+    constructor(private readonly jwtService: JwtService) {}
+
+    private getTeacherIdFromToken(req: any) {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            throw new UnauthorizedException('Thiếu token');
+        }
+
+        const token = authHeader.split(' ')[1];
+        let user: any;
+
+        try {
+            user = this.jwtService.verify(token);
+        } catch (error) {
+            throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
+        }
+
+        if (user.role !== 'teacher') {
+            throw new ForbiddenException('Bạn không có quyền thực hiện chức năng này');
+        }
+
+        return user.id;
+    }
+
+    // Tạo token test
+    testToken() {
+        const token = this.jwtService.sign({
+            id: 1,
+            role: 'teacher',
+        });
+
+        return {
+            token,
+        };
+    }
+
+    // Tạo câu hỏi
+    async createQuestion(body: any, req: any) {
+        const teacher_id = this.getTeacherIdFromToken(req);
+        const { question, answer1, answer2, answer3, answer4, correct } = body;
 
         if (!question) {
             throw new BadRequestException('Thiếu nội dung câu hỏi');
@@ -23,15 +68,15 @@ export class TeacherService {
 
         const correctIndex = Number(correct);
 
-        if (correctIndex < 0 || correctIndex > 3) {
+        if (Number.isNaN(correctIndex) || correctIndex < 1 || correctIndex > 4) {
             throw new BadRequestException('Đáp án đúng không hợp lệ');
         }
 
         const { data: createdQuestion, error: questionError } = await this.supabase
             .from('questions')
             .insert({
-            content: question,
-            teacher_id,
+                content: question,
+                teacher_id,
             })
             .select()
             .single();
@@ -43,13 +88,10 @@ export class TeacherService {
         const answerRows = answers.map((answer, index) => ({
             question_id: createdQuestion.id,
             content: answer,
-            is_correct: index === correctIndex,
+            is_correct: index + 1 === correctIndex,
         }));
 
-        const { data: createdAnswers, error: answerError } = await this.supabase
-            .from('answers')
-            .insert(answerRows)
-            .select();
+        const { error: answerError } = await this.supabase.from('answers').insert(answerRows);
 
         if (answerError) {
             throw new BadRequestException(answerError.message);
@@ -60,10 +102,14 @@ export class TeacherService {
         };
     }
 
-   //Xoá câu hỏi
-    async deleteQuestion(body: any) {
+    // Xoá câu hỏi
+    async deleteQuestion(body: any, req: any) {
+        const teacher_id = this.getTeacherIdFromToken(req);
+        const { id } = body;
 
-        const { id, teacher_id } = body;
+        if (!id) {
+            throw new BadRequestException('Thiếu question id');
+        }
 
         const { data: question, error: findError } = await this.supabase
             .from('questions')
@@ -73,9 +119,7 @@ export class TeacherService {
             .single();
 
         if (findError || !question) {
-            throw new BadRequestException(
-            'Không tìm thấy câu hỏi hoặc bạn không có quyền xóa',
-            );
+            throw new BadRequestException('Không tìm thấy câu hỏi hoặc bạn không có quyền xóa');
         }
 
         const { error: answerError } = await this.supabase
@@ -102,17 +146,10 @@ export class TeacherService {
         };
     }
 
-    //Tạo đề thi
-    async createExam(body: any) {
-
-        const {
-            title,
-            duration,
-            start_time,
-            end_time,
-            teacher_id,
-            question_ids,
-        } = body;
+    // Tạo đề thi
+    async createExam(body: any, req: any) {
+        const teacher_id = this.getTeacherIdFromToken(req);
+        const { title, duration, start_time, end_time, question_ids } = body;
 
         if (!title) {
             throw new BadRequestException('Thiếu tiêu đề đề thi');
@@ -120,10 +157,6 @@ export class TeacherService {
 
         if (!duration) {
             throw new BadRequestException('Thiếu thời gian làm bài');
-        }
-
-        if (!teacher_id) {
-            throw new BadRequestException('Thiếu teacher_id');
         }
 
         if (!question_ids || question_ids.length === 0) {
@@ -141,27 +174,22 @@ export class TeacherService {
         }
 
         if (!questions || questions.length !== question_ids.length) {
-            throw new BadRequestException(
-            'Có câu hỏi không tồn tại hoặc không thuộc giáo viên này',
-            );
+            throw new BadRequestException('Có câu hỏi không tồn tại hoặc không thuộc giáo viên này');
         }
 
-        const examCode = Math.random()
-            .toString(36)
-            .substring(2, 8)
-            .toUpperCase();
+        const examCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
         const { data: createdExam, error: examError } = await this.supabase
             .from('exams')
             .insert({
-            title,
-            duration,
-            code: examCode,
-            teacher_id,
-            status: 'active',
-            start_time,
-            end_time,
-            created_at: new Date(),
+                title,
+                duration,
+                code: examCode,
+                teacher_id,
+                status: 'active',
+                start_time,
+                end_time,
+                created_at: new Date(),
             })
             .select()
             .single();
@@ -180,11 +208,7 @@ export class TeacherService {
             .insert(examQuestions);
 
         if (questionError) {
-
-            await this.supabase
-            .from('exams')
-            .delete()
-            .eq('id', createdExam.id);
+            await this.supabase.from('exams').delete().eq('id', createdExam.id);
 
             throw new BadRequestException(questionError.message);
         }
@@ -195,16 +219,13 @@ export class TeacherService {
         };
     }
 
-    async deleteExam(body: any) {
-
-        const { id, teacher_id } = body;
+    // Xoá đề thi
+    async deleteExam(body: any, req: any) {
+        const teacher_id = this.getTeacherIdFromToken(req);
+        const { id } = body;
 
         if (!id) {
             throw new BadRequestException('Thiếu exam id');
-        }
-
-        if (!teacher_id) {
-            throw new BadRequestException('Thiếu teacher_id');
         }
 
         const { data: exam, error: findError } = await this.supabase
@@ -215,9 +236,7 @@ export class TeacherService {
             .single();
 
         if (findError || !exam) {
-            throw new BadRequestException(
-            'Không tìm thấy đề thi hoặc bạn không có quyền xóa',
-            );
+            throw new BadRequestException('Không tìm thấy đề thi hoặc bạn không có quyền xóa');
         }
 
         const { error: examQuestionError } = await this.supabase
@@ -243,6 +262,4 @@ export class TeacherService {
             message: 'Xóa đề thi thành công',
         };
     }
-
 }
-
