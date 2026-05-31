@@ -45,7 +45,7 @@ export default function StudentLayout() {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Student Dashboard
           </Typography>
-          <UserDropdown username="student_user" role="student" />
+          <UserDropdown />
         </Toolbar>
       </AppBar>
 
