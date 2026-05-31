@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Req } from '@nestjs/common';
 import { TeacherService } from './teacher.service';
 
 @Controller('teacher')
@@ -45,4 +45,48 @@ export class TeacherController {
         return this.teacherService.deleteExam(body, req);
     }
 
+    @Put('updateQuestion')
+    updateQuestion(
+        @Body() body: any,
+        @Req() req: any
+    ) {
+        return this.teacherService.updateQuestion(body, req);
+    }
+
+    @Put('updateExam')
+    updateExam(
+        @Body() body: any,
+        @Req() req: any
+    ) {
+        return this.teacherService.updateExam(body, req);
+    }
+
+    @Get('getDashboard')
+     getDashboard(
+        @Req() req: any
+    ) {
+        return this.teacherService.getDashboard(req);
+    }
+
+    @Get('getAllExams')
+    getAllExams(
+        @Req() req: any
+    ) {
+        return this.teacherService.getAllExams(req);
+    }
+
+    @Get('getAllQuestions')
+    getAllQuestions(
+        @Req() req: any
+    ) {
+        return this.teacherService.getAllQuestions(req);
+    }
+
+    @Get('getExam/:id')
+    getExam(
+        @Param('id') id: string,
+        @Req() req: any
+    ) {
+        return this.teacherService.getExam(Number(id), req);
+    }
 }
