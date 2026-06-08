@@ -22,7 +22,7 @@ const mockResults = {
   totalQuestions: 5,
   correctAnswers: 4,
   incorrectAnswers: 1,
-  score: 80,
+  // score will be calculated as (correct / total) * 10
   answers: [
     { question: 'What is 2 + 2?', userAnswer: '4', correctAnswer: '4', isCorrect: true },
     { question: 'What is the capital of France?', userAnswer: 'Paris', correctAnswer: 'Paris', isCorrect: true },
@@ -61,10 +61,10 @@ export default function ResultPage() {
           <Card elevation={2}>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h3" fontWeight={600} color="primary">
-                {mockResults.score}%
+                {((mockResults.correctAnswers / mockResults.totalQuestions) * 10).toFixed(1)} / 10
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Final Score
+                Final Score (out of 10)
               </Typography>
             </CardContent>
           </Card>
