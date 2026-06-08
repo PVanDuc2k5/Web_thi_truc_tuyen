@@ -1,16 +1,21 @@
-import { Body, Controller, Delete, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { SupabaseAuthGuard } from './guards/supabase-auth.guard';
+import { Roles } from './decorators/roles.decorator';
 import { TeacherService } from './teacher.service';
 
 @Controller('teacher')
+@UseGuards(SupabaseAuthGuard)
 export class TeacherController {
   constructor(private readonly teacherService: TeacherService) {}
 
     @Get('test-token')
+    @Roles('teacher')
     testToken() {
         return this.teacherService.testToken();
     }
 
     @Post('createQuestion')
+    @Roles('teacher')
     async createQuestion(
         @Body() body: any,
         @Req() req: any
@@ -19,6 +24,7 @@ export class TeacherController {
     }
 
     @Delete('deleteQuestion')
+    @Roles('teacher')
     deleteQuestion(
         @Body()
         body: any,
@@ -28,6 +34,7 @@ export class TeacherController {
     }
 
     @Post('createExam')
+    @Roles('teacher')
     async createExam(
         @Body()
         body: any,
@@ -37,6 +44,7 @@ export class TeacherController {
     }
 
     @Delete('deleteExam')
+    @Roles('teacher')
     deleteExam(
         @Body()
         body: any,
