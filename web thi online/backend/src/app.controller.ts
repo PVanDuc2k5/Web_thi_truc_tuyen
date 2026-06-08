@@ -6,11 +6,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
-  async getHello(): Promise<{
-    message: string;
-    supabaseConfigured: boolean;
-    supabaseConnected: boolean;
-  }> {
+  async getHello() {
     return this.appService.getHello();
   }
 }

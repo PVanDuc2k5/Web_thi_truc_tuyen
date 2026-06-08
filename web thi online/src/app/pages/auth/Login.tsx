@@ -6,6 +6,9 @@ import apiClient from '../../../lib/api-client';
 import { TextField, Button, Box, Typography, Card, CardContent, Container } from '@mui/material';
 import { School } from '@mui/icons-material';
 
+// Import hàm signIn xịn sò từ thư mục auth
+import { signIn } from '../../../lib/auth';
+
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');

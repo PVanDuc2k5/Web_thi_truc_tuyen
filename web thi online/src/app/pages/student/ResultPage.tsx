@@ -33,28 +33,28 @@ const mockResults = {
 };
 
 export default function ResultPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { examId } = useParams();
+  
+  // Lấy dữ liệu điểm số được truyền từ trang ExamPage sang
+  const { result, examTitle } = location.state || { 
+    result: { score: 0, correctCount: 0, totalQuestions: 0 }, 
+    examTitle: 'Kết quả bài thi' 
+  };
 
   return (
-    <Box>
-      <Paper
-        elevation={3}
-        sx={{
-          p: 4,
-          mb: 3,
-          textAlign: 'center',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white',
-        }}
-      >
-        <Typography variant="h4" fontWeight={600} gutterBottom>
-          Exam Results
+    <Box sx={{ maxWidth: 700, mx: 'auto', mt: 10, p: 2 }}>
+      <Paper elevation={4} sx={{ p: 5, borderRadius: 3, textAlign: 'center', border: '1px solid #e0e0e0' }}>
+        <AssignmentTurnedIn sx={{ fontSize: 80, color: 'rgb(22, 119, 185)', mb: 2 }} />
+        
+        <Typography variant="h4" fontWeight={700} sx={{ fontFamily: "'Palatino Linotype', Palatino, serif", mb: 1 }}>
+          {examTitle}
         </Typography>
-        <Typography variant="h6">
-          {mockResults.examTitle}
+        
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+          Chúc mừng bạn đã hoàn thành bài thi!
         </Typography>
-      </Paper>
 
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, md: 3 }}>
@@ -107,61 +107,41 @@ export default function ResultPage() {
         </Grid>
       </Grid>
 
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <Typography variant="h5" fontWeight={600} gutterBottom>
-          Answer Review
-        </Typography>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell sx={{ fontWeight: 600 }}>Question</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Your Answer</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Correct Answer</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Result</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {mockResults.answers.map((answer, idx) => (
-                <TableRow key={idx} hover>
-                  <TableCell>{answer.question}</TableCell>
-                  <TableCell>{answer.userAnswer}</TableCell>
-                  <TableCell>{answer.correctAnswer}</TableCell>
-                  <TableCell>
-                    {answer.isCorrect ? (
-                      <Chip
-                        icon={<CheckCircle />}
-                        label="Correct"
-                        color="success"
-                        size="small"
-                      />
-                    ) : (
-                      <Chip
-                        icon={<Cancel />}
-                        label="Incorrect"
-                        color="error"
-                        size="small"
-                      />
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 10, mb: 5 }}>
+          <Box>
+            <Typography variant="h6" color="text.secondary">Số câu đúng</Typography>
+            <Typography variant="h3" fontWeight={800} color="rgb(22, 119, 185)">
+              {result.correctCount} <span style={{ fontSize: '20px', color: '#999' }}>/ {result.totalQuestions}</span>
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="h6" color="text.secondary">Điểm số</Typography>
+            <Typography variant="h1" fontWeight={900} sx={{ color: 'rgb(22, 119, 185)' }}>
+              {result.score}
+            </Typography>
+          </Box>
+        </Box>
 
-      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-        <Button
-          variant="contained"
-          size="large"
-          startIcon={<Home />}
-          onClick={() => navigate('/student')}
-          sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
-        >
-          Back to Dashboard
-        </Button>
-      </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3 }}>
+          <Button 
+            variant="contained" 
+            startIcon={<Home />}
+            onClick={() => navigate('/student/dashboard')}
+            sx={{ bgcolor: 'rgb(22, 119, 185)', px: 4, py: 1.5, borderRadius: 2 }}
+          >
+            Về Trang Chủ
+          </Button>
+          
+          <Button 
+            variant="outlined" 
+            startIcon={<Replay />}
+            onClick={() => navigate(`/student/exam/${examId}`)}
+            sx={{ color: 'rgb(22, 119, 185)', borderColor: 'rgb(22, 119, 185)', px: 4, py: 1.5, borderRadius: 2 }}
+          >
+            Thi Lại
+          </Button>
+        </Box>
+      </Paper>
     </Box>
   );
 }
