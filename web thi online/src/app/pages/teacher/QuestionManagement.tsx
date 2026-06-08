@@ -20,6 +20,7 @@ import {
   FormControlLabel,
   Radio,
   FormLabel,
+  MenuItem,
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 
@@ -27,33 +28,73 @@ const questions = [
   {
     id: 1,
     question: 'What is 2 + 2?',
+    category: 'Math',
     answers: ['3', '4', '5', '6'],
     correct: 1,
   },
   {
     id: 2,
     question: 'What is the capital of France?',
+    category: 'Geography',
     answers: ['London', 'Berlin', 'Paris', 'Madrid'],
     correct: 2,
   },
   {
     id: 3,
     question: 'Which planet is closest to the sun?',
+    category: 'Science',
     answers: ['Venus', 'Mercury', 'Earth', 'Mars'],
     correct: 1,
   },
 ];
 
+const categoryOptions = ['Math', 'Geography', 'Science', 'Literature', 'Chemistry', 'Physics'];
+
 export default function QuestionManagement() {
   const [openDialog, setOpenDialog] = useState(false);
+  const [editingQuestionId, setEditingQuestionId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     question: '',
+    category: '',
     answer1: '',
     answer2: '',
     answer3: '',
     answer4: '',
     correct: '0',
   });
+
+  const openCreateDialog = () => {
+    setEditingQuestionId(null);
+    setFormData({
+      question: '',
+      category: '',
+      answer1: '',
+      answer2: '',
+      answer3: '',
+      answer4: '',
+      correct: '0',
+    });
+    setOpenDialog(true);
+  };
+
+  const openEditDialog = (question: typeof questions[number]) => {
+    setEditingQuestionId(question.id);
+    setFormData({
+      question: question.question,
+      category: question.category,
+      answer1: question.answers[0],
+      answer2: question.answers[1],
+      answer3: question.answers[2],
+      answer4: question.answers[3],
+      correct: question.correct.toString(),
+    });
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setEditingQuestionId(null);
+  };
 
   return (
     <Box>
@@ -64,7 +105,7 @@ export default function QuestionManagement() {
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={() => setOpenDialog(true)}
+          onClick={openCreateDialog}
           sx={{
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           }}
@@ -79,6 +120,7 @@ export default function QuestionManagement() {
             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
               <TableCell fontWeight={600}>ID</TableCell>
               <TableCell fontWeight={600}>Question</TableCell>
+              <TableCell fontWeight={600}>Category</TableCell>
               <TableCell fontWeight={600}>Answers</TableCell>
               <TableCell fontWeight={600}>Correct Answer</TableCell>
               <TableCell fontWeight={600} align="right">Actions</TableCell>
@@ -89,6 +131,7 @@ export default function QuestionManagement() {
               <TableRow key={q.id} hover>
                 <TableCell>{q.id}</TableCell>
                 <TableCell>{q.question}</TableCell>
+                <TableCell>{q.category}</TableCell>
                 <TableCell>
                   {q.answers.map((ans, idx) => (
                     <Box key={idx} component="span" sx={{ display: 'block', fontSize: '0.9rem' }}>
@@ -98,7 +141,7 @@ export default function QuestionManagement() {
                 </TableCell>
                 <TableCell>{q.answers[q.correct]}</TableCell>
                 <TableCell align="right">
-                  <IconButton color="primary" size="small">
+                  <IconButton color="primary" size="small" onClick={() => openEditDialog(q)}>
                     <Edit />
                   </IconButton>
                   <IconButton color="error" size="small">
@@ -111,9 +154,24 @@ export default function QuestionManagement() {
         </Table>
       </TableContainer>
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Create New Question</DialogTitle>
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+        <DialogTitle>{editingQuestionId ? 'Edit Question' : 'Create New Question'}</DialogTitle>
         <DialogContent>
+          <TextField
+            fullWidth
+            select
+            label="Category"
+            margin="normal"
+            value={formData.category}
+            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+          >
+            {categoryOptions.map((category) => (
+              <MenuItem key={category} value={category}>
+                {category}
+              </MenuItem>
+            ))}
+          </TextField>
+
           <TextField
             fullWidth
             label="Question"
@@ -156,13 +214,13 @@ export default function QuestionManagement() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
           <Button
             variant="contained"
-            onClick={() => setOpenDialog(false)}
+            onClick={handleCloseDialog}
             sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
           >
-            Create Question
+            {editingQuestionId ? 'Save Changes' : 'Create Question'}
           </Button>
         </DialogActions>
       </Dialog>
