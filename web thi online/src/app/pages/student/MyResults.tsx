@@ -18,7 +18,7 @@ const results = [
   {
     id: 1,
     examName: 'Mathematics Final Exam',
-    score: 42,
+    correctAnswers: 42,
     totalQuestions: 50,
     duration: '85 min',
     submissionDate: '2026-04-20 14:30',
@@ -26,7 +26,7 @@ const results = [
   {
     id: 2,
     examName: 'Biology Practice Test',
-    score: 38,
+    correctAnswers: 38,
     totalQuestions: 40,
     duration: '70 min',
     submissionDate: '2026-04-18 11:15',
@@ -34,7 +34,7 @@ const results = [
   {
     id: 3,
     examName: 'Chemistry Quiz 1',
-    score: 18,
+    correctAnswers: 18,
     totalQuestions: 20,
     duration: '28 min',
     submissionDate: '2026-04-15 09:45',
@@ -42,7 +42,7 @@ const results = [
   {
     id: 4,
     examName: 'Physics Basics',
-    score: 25,
+    correctAnswers: 25,
     totalQuestions: 30,
     duration: '55 min',
     submissionDate: '2026-04-10 16:20',
@@ -52,12 +52,12 @@ const results = [
 export default function MyResults() {
   const navigate = useNavigate();
 
-  const getPercentage = (score: number, total: number) => {
-    return ((score / total) * 100).toFixed(0);
+  const getPercentage = (correct: number, total: number) => {
+    return ((correct / total) * 100).toFixed(0);
   };
 
-  const getScoreChip = (score: number, total: number) => {
-    const percentage = parseFloat(getPercentage(score, total));
+  const getScoreChip = (correct: number, total: number) => {
+    const percentage = parseFloat(getPercentage(correct, total));
     if (percentage >= 80) return 'success';
     if (percentage >= 60) return 'warning';
     return 'error';
@@ -87,13 +87,13 @@ export default function MyResults() {
                 <TableCell>{result.examName}</TableCell>
                 <TableCell align="center">
                   <strong>
-                    {result.score}/{result.totalQuestions}
+                    {((result.correctAnswers / result.totalQuestions) * 10).toFixed(1)}/10
                   </strong>
                 </TableCell>
                 <TableCell align="center">
                   <Chip
-                    label={`${getPercentage(result.score, result.totalQuestions)}%`}
-                    color={getScoreChip(result.score, result.totalQuestions)}
+                    label={`${getPercentage(result.correctAnswers, result.totalQuestions)}%`}
+                    color={getScoreChip(result.correctAnswers, result.totalQuestions)}
                     size="small"
                   />
                 </TableCell>

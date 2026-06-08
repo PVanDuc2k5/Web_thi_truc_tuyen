@@ -23,6 +23,7 @@ import {
   DialogContent,
   DialogTitle,
   TextField,
+  MenuItem,
 } from '@mui/material';
 import { ArrowBack, Edit, People, QuestionAnswer, Schedule, CheckCircle, ContentCopy, VpnKey } from '@mui/icons-material';
 import { toast } from 'sonner';
@@ -70,7 +71,7 @@ export default function ExamDetail() {
     startTime: examData.startTime,
     endTime: examData.endTime,
     maxAttempts: String(examData.maxAttempts),
-    description: examData.description,
+    status: examData.status,
   });
 
   const handleCopyCode = () => {
@@ -85,7 +86,7 @@ export default function ExamDetail() {
       startTime: examData.startTime,
       endTime: examData.endTime,
       maxAttempts: String(examData.maxAttempts),
-      description: examData.description,
+      status: examData.status,
     });
     setEditOpen(true);
   };
@@ -110,9 +111,7 @@ export default function ExamDetail() {
           <Typography variant="h4" fontWeight={600}>
             {examData.title}
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-            {examData.description}
-          </Typography>
+          {/* description removed (not stored in backend) */}
         </Box>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <Paper
@@ -261,13 +260,15 @@ export default function ExamDetail() {
           />
           <TextField
             fullWidth
-            label="Description"
+            select
+            label="Status"
             margin="normal"
-            multiline
-            minRows={3}
-            value={editForm.description}
-            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-          />
+            value={editForm.status}
+            onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+          >
+            <MenuItem value="active">active</MenuItem>
+            <MenuItem value="draft">draft</MenuItem>
+          </TextField>
           <TextField
             fullWidth
             label="Duration (minutes)"
@@ -319,8 +320,6 @@ export default function ExamDetail() {
                 <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                   <TableCell fontWeight={600}>#</TableCell>
                   <TableCell fontWeight={600}>Question</TableCell>
-                  <TableCell fontWeight={600}>Type</TableCell>
-                  <TableCell fontWeight={600} align="right">Points</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -328,10 +327,6 @@ export default function ExamDetail() {
                   <TableRow key={q.id} hover>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>{q.question}</TableCell>
-                    <TableCell>
-                      <Chip label={q.type} size="small" variant="outlined" />
-                    </TableCell>
-                    <TableCell align="right">{q.points}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
