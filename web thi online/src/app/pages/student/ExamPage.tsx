@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { useAuthStore } from '../../../lib/auth-store';
 import {
   Box, Typography, Paper, RadioGroup, FormControlLabel, Radio,
   Button, LinearProgress, Card, CardContent, CircularProgress
@@ -14,6 +15,7 @@ interface Exam { id: number; title: string; duration: number; }
 export default function ExamPage() {
   const navigate = useNavigate();
   const { examId } = useParams();
+  const { user } = useAuthStore();
 
   // State quản lý Data từ API
   const [exam, setExam] = useState<Exam | null>(null);
@@ -71,13 +73,10 @@ export default function ExamPage() {
   const handleSubmit = async () => {
     if (!exam || isSubmitting) return;
 
-    // Lấy thông tin user thật từ localStorage
-    const savedUser = localStorage.getItem('currentUser');
-    const currentUser = savedUser ? JSON.parse(savedUser) : null;
-
-    if (!currentUser) {
+    // Lấy thông tin user từ Zustand auth store
+    if (!user) {
       alert('Lỗi: Không tìm thấy thông tin sinh viên. Vui lòng quay lại trang Đăng nhập!');
-      navigate('/login');
+      navigate('/');
       return;
     }
     
@@ -95,7 +94,7 @@ export default function ExamPage() {
       }));
 
       const payload = {
-        userId: currentUser.id, // Truyền ID THẬT của người thi xuống Database
+        userId: user.id, // Truyền ID THẬT của người thi xuống Database
         examId: exam.id,
         answers: answersPayload
       };

@@ -20,6 +20,7 @@ import { PlayArrow, CheckCircle, Schedule, Search, VpnKey, Add } from '@mui/icon
 
 // Import supabase từ thư mục lib (Đường dẫn lùi 3 cấp ra ngoài src)
 import { supabase } from '../../../lib/supabase';
+import { useAuthStore } from '../../../lib/auth-store';
 
 // Chuyển mảng dữ liệu này thành mảng khởi tạo tĩnh
 const initialExams = [
@@ -45,18 +46,15 @@ export default function StudentDashboard() {
   useEffect(() => {
     const fetchExamStatus = async () => {
       try {
-        // 1. Lấy và kiểm tra thẻ sinh viên cực kỳ cẩn thận
-        const savedUser = localStorage.getItem('currentUser');
-        if (!savedUser || savedUser === 'undefined') return; 
-        
-        const currentUser = JSON.parse(savedUser);
-        if (!currentUser || !currentUser.id) return; // Nếu không có ID thì dừng luôn
+        // Lấy thông tin user từ Zustand auth store
+        const user = useAuthStore.getState().user;
+        if (!user?.id) return;
 
-        // 2. Kéo dữ liệu từ DB
+        // Kéo dữ liệu từ DB
         const { data: results, error } = await supabase
           .from('results')
           .select('exam_id')
-          .eq('user_id', currentUser.id);
+          .eq('user_id', user.id);
 
         if (error) {
           console.error("Supabase báo lỗi:", error);
