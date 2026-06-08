@@ -1,30 +1,24 @@
 import {
     Injectable,
     BadRequestException,
-    UnauthorizedException,
-    ForbiddenException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { createClient } from '@supabase/supabase-js';
+import { SupabaseService } from './supabase.service';
 import { randomInt } from 'crypto';
 
 @Injectable()
 export class TeacherService {
-    private supabase = createClient(
-        process.env.SUPABASE_URL as string,
-        process.env.SUPABASE_SERVICE_ROLE_KEY as string,
-    );
+    constructor(private readonly supabaseService: SupabaseService) {}
 
-    constructor(private readonly jwtService: JwtService) {}
+    private get supabase() {
+        return this.supabaseService.getClient();
+    }
 
     private createExamCode() {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         let code = '';
-
         for (let i = 0; i < 6; i++) {
             code += chars[randomInt(chars.length)];
         }
-
         return code;
     }
 
@@ -50,45 +44,9 @@ export class TeacherService {
         throw new BadRequestException('Khong tao duoc ma de thi, vui long thu lai');
     }
 
-    // Lấy teacher_id từ token
-    private getTeacherIdFromToken(req: any) {
-        const authHeader = req.headers.authorization;
-
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            throw new UnauthorizedException('Thiếu token');
-        }
-
-        const token = authHeader.split(' ')[1];
-        let user: any;
-
-        try {
-            user = this.jwtService.verify(token);
-        } catch (error) {
-            throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
-        }
-
-        if (user.role !== 'teacher') {
-            throw new ForbiddenException('Bạn không có quyền thực hiện chức năng này');
-        }
-
-        return user.id;
-    }
-
-    // Tạo token test
-    testToken() {
-        const token = this.jwtService.sign({
-            id: 1,
-            role: 'teacher',
-        });
-
-        return {
-            token,
-        };
-    }
-
     // Tạo câu hỏi
-    async createQuestion(body: any, req: any) {
-        const teacher_id = this.getTeacherIdFromToken(req);
+    async createQuestion(body: any, userId: string) {
+        const teacher_id = userId;
         const { category, question, answer1, answer2, answer3, answer4, correct } = body;
 
         if (!category) {
@@ -143,8 +101,8 @@ export class TeacherService {
     }
 
     // Xoá câu hỏi
-    async deleteQuestion(body: any, req: any) {
-        const teacher_id = this.getTeacherIdFromToken(req);
+    async deleteQuestion(body: any, userId: string) {
+        const teacher_id = userId;
         const { id } = body;
 
         if (!id) {
@@ -187,8 +145,8 @@ export class TeacherService {
     }
 
     // Tạo đề thi
-    async createExam(body: any, req: any) {
-        const teacher_id = this.getTeacherIdFromToken(req);
+    async createExam(body: any, userId: string) {
+        const teacher_id = userId;
         const { title, duration, status, start_time, end_time, question_ids } = body;
 
         if (!title) {
@@ -249,7 +207,6 @@ export class TeacherService {
 
         if (questionError) {
             await this.supabase.from('exams').delete().eq('id', createdExam.id);
-
             throw new BadRequestException(questionError.message);
         }
 
@@ -259,8 +216,8 @@ export class TeacherService {
     }
 
     // Xoá đề thi
-    async deleteExam(body: any, req: any) {
-        const teacher_id = this.getTeacherIdFromToken(req);
+    async deleteExam(body: any, userId: string) {
+        const teacher_id = userId;
         const { id } = body;
 
         if (!id) {
@@ -303,8 +260,8 @@ export class TeacherService {
     }
 
     // Sửa câu hỏi
-    async updateQuestion(body: any, req: any) {
-        const teacher_id = this.getTeacherIdFromToken(req);
+    async updateQuestion(body: any, userId: string) {
+        const teacher_id = userId;
         const { id, category, question, answer1, answer2, answer3, answer4, correct } = body;
 
         if (!id) {
@@ -384,8 +341,8 @@ export class TeacherService {
     }
 
     // Sửa đề thi
-    async updateExam(body: any, req: any) {
-        const teacher_id = this.getTeacherIdFromToken(req);
+    async updateExam(body: any, userId: string) {
+        const teacher_id = userId;
         const { id, title, duration, status, start_time, end_time } = body;
 
         if (!id) {
@@ -411,7 +368,7 @@ export class TeacherService {
             throw new BadRequestException('Không tìm thấy đề thi hoặc bạn không có quyền sửa');
         }
 
-        const { data: updatedExam, error: updateError } = await this.supabase
+        const { error: updateError } = await this.supabase
             .from('exams')
             .update({
                 title,
@@ -421,9 +378,7 @@ export class TeacherService {
                 end_time,
             })
             .eq('id', id)
-            .eq('teacher_id', teacher_id)
-            .select()
-            .single();
+            .eq('teacher_id', teacher_id);
 
         if (updateError) {
             throw new BadRequestException(updateError.message);
@@ -435,8 +390,8 @@ export class TeacherService {
     }
 
     // Lấy dữ liệu dashboard
-    async getDashboard(req: any) {
-        const teacher_id = this.getTeacherIdFromToken(req);
+    async getDashboard(userId: string) {
+        const teacher_id = userId;
 
         const { count: examCount, error: examError } = await this.supabase
             .from('exams')
@@ -490,15 +445,15 @@ export class TeacherService {
         };
     }
 
-    // Lấy danh sách exam cho dashboard
-    async getAllExams(req: any) {
-        const teacher_id = this.getTeacherIdFromToken(req);
+    // Lấy danh sách exam
+    async getAllExams(userId: string) {
+        const teacher_id = userId;
 
         const { data: exams, error: examError } = await this.supabase
             .from('exams')
             .select('id, title, code, status, duration, created_at')
             .eq('teacher_id', teacher_id)
-            .order('id', { ascending: false }); // sắp xếp theo id giảm dần để exam mới nhất hiển thị trước
+            .order('id', { ascending: false });
 
         if (examError) {
             throw new BadRequestException(examError.message);
@@ -543,10 +498,10 @@ export class TeacherService {
             exams: result,
         };
     }
-    
+
     // Lấy toàn bộ câu hỏi của giáo viên
-    async getAllQuestions(req: any) {
-        const teacher_id = this.getTeacherIdFromToken(req);
+    async getAllQuestions(userId: string) {
+        const teacher_id = userId;
 
         const { data: questions, error: questionError } = await this.supabase
             .from('questions')
@@ -576,6 +531,7 @@ export class TeacherService {
             result.push({
                 id: question.id,
                 question: question.content,
+                category: question.category,
                 answers: answers.map((a) => a.content),
                 correct: correctAnswer
                     ? answers.findIndex((a) => a.is_correct) + 1
@@ -589,8 +545,8 @@ export class TeacherService {
     }
 
     // Lấy chi tiết 1 exam
-    async getExam(id: number, req: any) {
-        const teacher_id = this.getTeacherIdFromToken(req);
+    async getExam(id: number, userId: string) {
+        const teacher_id = userId;
 
         if (!id) {
             throw new BadRequestException('Thiếu exam id');
@@ -609,28 +565,24 @@ export class TeacherService {
             );
         }
 
-        const { data: examQuestions, error: examQuestionError } =
-            await this.supabase
-                .from('exam_questions')
-                .select('question_id')
-                .eq('exam_id', id);
+        const { data: examQuestions, error: examQuestionError } = await this.supabase
+            .from('exam_questions')
+            .select('question_id')
+            .eq('exam_id', id);
 
         if (examQuestionError) {
             throw new BadRequestException(examQuestionError.message);
         }
 
-        const questionIds = examQuestions.map(
-            (item) => item.question_id,
-        );
+        const questionIds = examQuestions.map((item) => item.question_id);
 
         let questions: any[] = [];
 
         if (questionIds.length > 0) {
-            const { data: questionData, error: questionError } =
-                await this.supabase
-                    .from('questions')
-                    .select('id, content')
-                    .in('id', questionIds);
+            const { data: questionData, error: questionError } = await this.supabase
+                .from('questions')
+                .select('id, content')
+                .in('id', questionIds);
 
             if (questionError) {
                 throw new BadRequestException(questionError.message);
@@ -642,19 +594,16 @@ export class TeacherService {
             }));
         }
 
-        const { data: results, error: resultError } =
-            await this.supabase
-                .from('results')
-                .select('user_id, score')
-                .eq('exam_id', id);
+        const { data: results, error: resultError } = await this.supabase
+            .from('results')
+            .select('user_id, score')
+            .eq('exam_id', id);
 
         if (resultError) {
             throw new BadRequestException(resultError.message);
         }
 
-        const uniqueStudents = new Set(
-            results.map((item) => item.user_id),
-        );
+        const uniqueStudents = new Set(results.map((item) => item.user_id));
 
         let averageScore = 0;
 
@@ -663,11 +612,10 @@ export class TeacherService {
                 (sum, item) => sum + Number(item.score),
                 0,
             );
-
             averageScore = totalScore / results.length;
         }
 
-        const examData = {
+        return {
             id: exam.id,
             title: exam.title,
             questions: questions.length,
@@ -681,8 +629,5 @@ export class TeacherService {
             endTime: exam.end_time,
             questionList: questions,
         };
-
-        return examData;
     }
-
 }

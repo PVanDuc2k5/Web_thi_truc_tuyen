@@ -1,18 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TeacherController } from './teacher.controller';
 import { TeacherService } from './teacher.service';
-import { JwtModule } from '@nestjs/jwt';
+import { SupabaseService } from './supabase.service';
 
 @Module({
-  imports: [
-    JwtModule.register({
-      secret: 'secret_key',
-      signOptions: {
-        expiresIn: '1d',
-      },
-    }),
-  ],
   controllers: [TeacherController],
-  providers: [TeacherService],
+  providers: [TeacherService, SupabaseService],
 })
 export class TeacherModule {}
