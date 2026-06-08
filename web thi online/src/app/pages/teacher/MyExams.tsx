@@ -278,15 +278,7 @@ export default function MyExams() {
                         <Visibility />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Edit">
-                      <IconButton
-                        color="primary"
-                        size="small"
-                        onClick={() => navigate(`/teacher/exam/${exam.id}`)}
-                      >
-                        <Edit />
-                      </IconButton>
-                    </Tooltip>
+                    {/* Edit removed here - users should go to exam detail to edit */}
                     <Tooltip title="Delete">
                       <IconButton color="error" size="small">
                         <Delete />

@@ -17,6 +17,7 @@ import {
   Alert,
   Divider,
   InputAdornment,
+  MenuItem,
 } from '@mui/material';
 import { Save, ContentCopy, CheckCircle, VpnKey } from '@mui/icons-material';
 import { toast } from 'sonner';
@@ -42,6 +43,7 @@ const generateExamCode = () => {
 export default function ExamBuilder() {
   const [examTitle, setExamTitle] = useState('');
   const [duration, setDuration] = useState('');
+  const [status, setStatus] = useState('active');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [maxAttempts, setMaxAttempts] = useState('1');
@@ -143,6 +145,18 @@ export default function ExamBuilder() {
                 startAdornment: <InputAdornment position="start">Limit:</InputAdornment>,
               }}
             />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField
+              fullWidth
+              select
+              label="Status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <MenuItem value="active">active</MenuItem>
+              <MenuItem value="draft">draft</MenuItem>
+            </TextField>
           </Grid>
         </Grid>
       </Paper>
