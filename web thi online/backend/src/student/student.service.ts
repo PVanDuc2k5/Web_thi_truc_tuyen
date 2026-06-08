@@ -1,12 +1,17 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { createClient } from '@supabase/supabase-js';
+// GỌI ĐỘNG CƠ SUPABASE ĐÃ ĐƯỢC CẤU HÌNH CHUẨN VÀO ĐÂY
+// (Nếu file supabase.service.ts nằm ở ngoài thư mục student, dùng ../)
+import { SupabaseService } from '../supabase.service'; 
 
 @Injectable()
 export class StudentService {
-  private supabase = createClient(
-    process.env.SUPABASE_URL as string,
-    process.env.SUPABASE_SERVICE_ROLE_KEY as string // Ép kiểu để TS không báo lỗi
-  );
+  // Inject SupabaseService thông qua constructor chuẩn của NestJS
+  constructor(private readonly supabaseService: SupabaseService) {}
+
+  // Lấy client kết nối an toàn
+  private get supabase() {
+    return this.supabaseService.getClient();
+  }
 
   // API 1: Lấy chi tiết đề thi và danh sách câu hỏi
   async getExamForStudent(examId: number) {
@@ -43,9 +48,14 @@ export class StudentService {
       questions: formattedQuestions
     };
   }
+
   // API 2: THÊM MỚI - Nộp bài, chấm tự động và lưu kết quả
   async submitExam(userId: number, examId: number, userAnswers: { questionId: number, answerId: number }[]) {
-    // 1. Lấy các đáp án ĐÚNG của đề thi này từ bảng answers
+    // 🟢 HỆ THỐNG ĐỊNH VỊ: In ra Terminal để biết Backend đang chạy
+    console.log(`\n🚀 [BẮT ĐẦU CHẤM BÀI] Học sinh ID: ${userId} | Đề thi ID: ${examId}`);
+    console.log(`📥 Nhận được ${userAnswers.length} câu trả lời từ Frontend...`);
+
+    // 1. Lấy các đáp án ĐÚNG
     const questionIds = userAnswers.map(a => a.questionId);
     const { data: correctData, error: fetchError } = await this.supabase
       .from('answers')
@@ -53,21 +63,29 @@ export class StudentService {
       .eq('is_correct', true)
       .in('question_id', questionIds);
 
-    if (fetchError) throw new HttpException('Lỗi khi truy xuất đáp án', HttpStatus.INTERNAL_SERVER_ERROR);
+    if (fetchError) {
+      console.error('❌ LỖI LẤY ĐÁP ÁN:', fetchError);
+      throw new HttpException('Lỗi khi truy xuất đáp án', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
-    // 2. Chấm điểm (Mỗi câu đúng được cộng điểm đều nhau)
+    // 2. Chấm điểm
     let correctCount = 0;
     const totalQuestions = userAnswers.length; 
     
+    if (totalQuestions === 0) {
+      throw new HttpException('Bài làm rỗng, chưa chọn đáp án nào!', HttpStatus.BAD_REQUEST);
+    }
+
     userAnswers.forEach(ua => {
       const isCorrect = correctData?.some(cd => cd.question_id === ua.questionId && cd.id === ua.answerId);
       if (isCorrect) correctCount++;
     });
     
-    // Tính điểm thang 10 (làm tròn 2 chữ số thập phân)
     const score = Math.round((correctCount / totalQuestions) * 10 * 100) / 100; 
+    console.log(`✅ Chấm xong! Số câu đúng: ${correctCount}/${totalQuestions} | Điểm số: ${score}`);
 
     // 3. Lưu tổng quát vào bảng results
+    console.log('💾 Đang cất điểm vào bảng "results"...');
     const { data: resultData, error: resultError } = await this.supabase
       .from('results')
       .insert({
@@ -80,16 +98,27 @@ export class StudentService {
       .select('id')
       .single();
 
-    if (resultError) throw new HttpException('Lỗi khi lưu bảng results', HttpStatus.INTERNAL_SERVER_ERROR);
+    if (resultError) {
+      console.error('❌ LỖI DATABASE (Bảng results):', resultError);
+      throw new HttpException('Lỗi khi lưu bảng results', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    console.log(`🎉 Đã lưu thành công điểm số! (Result ID: ${resultData.id})`);
 
-    // 4. Lưu chi tiết từng câu (để làm tính năng xem lại bài) vào bảng user_answers
+    // 4. Lưu chi tiết từng câu vào bảng user_answers
+    console.log('💾 Đang cất chi tiết từng câu vào bảng "user_answers"...');
     const detailAnswers = userAnswers.map(ua => ({
       result_id: resultData.id,
       question_id: ua.questionId,
       answer_id: ua.answerId
     }));
 
-    await this.supabase.from('user_answers').insert(detailAnswers);
+    const { error: detailError } = await this.supabase.from('user_answers').insert(detailAnswers);
+    if (detailError) {
+      console.error('⚠️ LỖI DATABASE (Bảng user_answers):', detailError);
+      // Lỗi chi tiết ta chỉ ghi log, không làm đứt luồng trả điểm cho học sinh
+    } else {
+      console.log('🎉 Đã cất xong chi tiết bài làm!');
+    }
 
     // Trả kết quả về cho màn hình Frontend hiển thị
     return {
@@ -99,5 +128,4 @@ export class StudentService {
       totalQuestions: totalQuestions
     };
   }
-
 }

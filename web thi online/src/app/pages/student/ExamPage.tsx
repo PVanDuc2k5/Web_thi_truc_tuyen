@@ -65,11 +65,21 @@ export default function ExamPage() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [loading, result, isSubmitting]); // Bỏ qua dependency timeLeft để tránh re-render liên tục
+  }, [loading, result, isSubmitting]);
 
   // Hàm Nộp bài gọi API Backend
   const handleSubmit = async () => {
     if (!exam || isSubmitting) return;
+
+    // Lấy thông tin user thật từ localStorage
+    const savedUser = localStorage.getItem('currentUser');
+    const currentUser = savedUser ? JSON.parse(savedUser) : null;
+
+    if (!currentUser) {
+      alert('Lỗi: Không tìm thấy thông tin sinh viên. Vui lòng quay lại trang Đăng nhập!');
+      navigate('/login');
+      return;
+    }
     
     // Nếu còn thời gian thì hỏi lại, hết giờ thì ép nộp luôn
     if (timeLeft > 0) {
@@ -85,7 +95,7 @@ export default function ExamPage() {
       }));
 
       const payload = {
-        userId: 1, // Fix cứng ID sinh viên tạm thời
+        userId: currentUser.id, // Truyền ID THẬT của người thi xuống Database
         examId: exam.id,
         answers: answersPayload
       };

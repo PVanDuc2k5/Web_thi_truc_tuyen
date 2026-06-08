@@ -7,20 +7,42 @@ import {
   TextField,
   Button,
   Typography,
-  MenuItem,
   Container,
+  Alert,
 } from '@mui/material';
 import { School } from '@mui/icons-material';
+
+// Import hàm signIn xịn sò từ thư mục auth
+import { signIn } from '../../../lib/auth';
 
 export default function Login() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('student');
+  const [loginError, setLoginError] = useState(''); // State báo lỗi đăng nhập
+  const [isLoading, setIsLoading] = useState(false); // State chống click nhiều lần
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (role === 'teacher') {
+    setLoginError('');
+    setIsLoading(true);
+
+    // 1. Gọi hàm signIn gọi xuống Database
+    const { data, error } = await signIn(username, password);
+
+    setIsLoading(false);
+
+    // 2. Nếu sai pass hoặc không có data thì báo lỗi
+    if (error || !data) {
+      setLoginError('Sai tên đăng nhập hoặc mật khẩu. Vui lòng thử lại!');
+      return;
+    }
+
+    // 3. Nếu đúng, lưu thẻ sinh viên (có chứa ID thật) vào localStorage
+    localStorage.setItem('currentUser', JSON.stringify(data));
+
+    // 4. Phân luồng dựa vào role THẬT từ Database trả về
+    if (data.role === 'teacher') {
       navigate('/teacher');
     } else {
       navigate('/student');
@@ -50,6 +72,13 @@ export default function Login() {
               </Typography>
             </Box>
 
+            {/* Thông báo lỗi nếu đăng nhập sai */}
+            {loginError && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {loginError}
+              </Alert>
+            )}
+
             <form onSubmit={handleLogin}>
               <TextField
                 fullWidth
@@ -59,6 +88,7 @@ export default function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
+                disabled={isLoading}
               />
               <TextField
                 fullWidth
@@ -69,24 +99,17 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isLoading}
               />
-              <TextField
-                fullWidth
-                select
-                label="Role"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                margin="normal"
-              >
-                <MenuItem key="student" value="student">Student</MenuItem>
-                <MenuItem key="teacher" value="teacher">Teacher</MenuItem>
-              </TextField>
+
+              {/* Đã xóa phần MenuItem chọn Role vì bây giờ hệ thống tự lấy Role thật từ Database! */}
 
               <Button
                 type="submit"
                 fullWidth
                 variant="contained"
                 size="large"
+                disabled={isLoading}
                 sx={{
                   mt: 3,
                   mb: 2,
@@ -97,7 +120,7 @@ export default function Login() {
                   },
                 }}
               >
-                Sign In
+                {isLoading ? 'Signing In...' : 'Sign In'}
               </Button>
 
               <Box sx={{ textAlign: 'center', mt: 2 }}>
@@ -106,6 +129,7 @@ export default function Login() {
                   <Button
                     onClick={() => navigate('/register')}
                     sx={{ textTransform: 'none' }}
+                    disabled={isLoading}
                   >
                     Register
                   </Button>

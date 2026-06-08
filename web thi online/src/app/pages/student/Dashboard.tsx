@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Box,
@@ -18,44 +18,72 @@ import {
 } from '@mui/material';
 import { PlayArrow, CheckCircle, Schedule, Search, VpnKey, Add } from '@mui/icons-material';
 
-const exams = [
-  {
-    id: 1,
-    title: 'Mathematics Final Exam',
-    questions: 50,
-    duration: 90,
-    status: 'not_started',
-  },
-  {
-    id: 2,
-    title: 'Physics Midterm',
-    questions: 30,
-    duration: 60,
-    status: 'in_progress',
-  },
-  {
-    id: 3,
-    title: 'Chemistry Quiz 1',
-    questions: 20,
-    duration: 30,
-    status: 'not_started',
-  },
-  {
-    id: 4,
-    title: 'Biology Practice Test',
-    questions: 40,
-    duration: 75,
-    status: 'completed',
-  },
+// Import supabase từ thư mục lib (Đường dẫn lùi 3 cấp ra ngoài src)
+import { supabase } from '../../../lib/supabase';
+
+// Chuyển mảng dữ liệu này thành mảng khởi tạo tĩnh
+const initialExams = [
+  { id: 1, title: 'Mathematics Final Exam', questions: 50, duration: 90, status: 'not_started' },
+  { id: 2, title: 'Physics Midterm', questions: 30, duration: 60, status: 'not_started' },
+  { id: 3, title: 'Chemistry Quiz 1', questions: 20, duration: 30, status: 'not_started' },
+  { id: 4, title: 'Biology Practice Test', questions: 40, duration: 75, status: 'not_started' },
 ];
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
+  
+  // Đưa mảng exams vào state để có thể cập nhật trạng thái động
+  const [examList, setExamList] = useState(initialExams);
+  
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [examCode, setExamCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [joinSuccess, setJoinSuccess] = useState('');
+
+  // 🚀 MA THUẬT NẰM Ở ĐÂY: Hàm gọi dữ liệu thật từ Database
+  useEffect(() => {
+    const fetchExamStatus = async () => {
+      try {
+        // 1. Lấy và kiểm tra thẻ sinh viên cực kỳ cẩn thận
+        const savedUser = localStorage.getItem('currentUser');
+        if (!savedUser || savedUser === 'undefined') return; 
+        
+        const currentUser = JSON.parse(savedUser);
+        if (!currentUser || !currentUser.id) return; // Nếu không có ID thì dừng luôn
+
+        // 2. Kéo dữ liệu từ DB
+        const { data: results, error } = await supabase
+          .from('results')
+          .select('exam_id')
+          .eq('user_id', currentUser.id);
+
+        if (error) {
+          console.error("Supabase báo lỗi:", error);
+          return; // Có lỗi thì dừng, không cho crash
+        }
+
+        // 🟢 BẢO VỆ CHỐNG TRẮNG TRANG: Đảm bảo results luôn là mảng, dù DB trả về null
+        const safeResults = results || [];
+        console.log("Dữ liệu điểm kéo từ Supabase:", safeResults);
+
+        const completedExamIds = safeResults.map(result => Number(result.exam_id));
+
+        // Cập nhật giao diện
+        setExamList(prevExams => 
+          prevExams.map(exam => ({
+            ...exam,
+            status: completedExamIds.includes(exam.id) ? 'completed' : 'not_started'
+          }))
+        );
+      } catch (error) {
+        // Bắt mọi lỗi lặt vặt khác để không bị trắng trang
+        console.error('Lỗi ngầm trong useEffect:', error);
+      }
+    };
+
+    fetchExamStatus();
+  }, []);
 
   const handleJoinExam = () => {
     setJoinError('');
@@ -77,7 +105,8 @@ export default function StudentDashboard() {
     }
   };
 
-  const filteredExams = exams
+  // 🔄 Cập nhật mảng được lọc (Dùng state examList thay cho biến exams cũ)
+  const filteredExams = examList
     .filter(exam => {
       if (filterStatus === 'all') return true;
       return exam.status === filterStatus;
@@ -99,7 +128,7 @@ export default function StudentDashboard() {
     }
   };
 
-  const getActionButton = (exam: typeof exams[0]) => {
+  const getActionButton = (exam: typeof initialExams[0]) => {
     if (exam.status === 'not_started') {
       return (
         <Button
