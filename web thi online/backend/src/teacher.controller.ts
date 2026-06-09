@@ -1,100 +1,84 @@
-import { Body, Controller, Delete, Get, Post, Req, Put, Param, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Put, Param, UseGuards } from '@nestjs/common';
 import { SupabaseAuthGuard } from './guards/supabase-auth.guard';
 import { Roles } from './decorators/roles.decorator';
+import { RolesGuard } from './guards/roles.guard';
+import { CurrentUser } from './decorators/user.decorator';
 import { TeacherService } from './teacher.service';
 
 @Controller('teacher')
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(SupabaseAuthGuard, RolesGuard)
+@Roles('teacher')
 export class TeacherController {
-  constructor(private readonly teacherService: TeacherService) {}
-
-    @Get('test-token')
-    @Roles('teacher')
-    testToken() {
-        return this.teacherService.testToken();
-    }
+    constructor(private readonly teacherService: TeacherService) {}
 
     @Post('createQuestion')
-    @Roles('teacher')
     async createQuestion(
         @Body() body: any,
-        @Req() req: any
+        @CurrentUser() user: any,
     ) {
-        return this.teacherService.createQuestion(body, req);
+        return this.teacherService.createQuestion(body, user.id);
     }
 
     @Delete('deleteQuestion')
-    @Roles('teacher')
     deleteQuestion(
-        @Body()
-        body: any,
-        @Req() req: any,
+        @Body() body: any,
+        @CurrentUser() user: any,
     ) {
-        return this.teacherService.deleteQuestion(body, req);
+        return this.teacherService.deleteQuestion(body, user.id);
     }
 
     @Post('createExam')
-    @Roles('teacher')
     async createExam(
-        @Body()
-        body: any,
-        @Req() req: any,
+        @Body() body: any,
+        @CurrentUser() user: any,
     ) {
-        return this.teacherService.createExam(body, req);
+        return this.teacherService.createExam(body, user.id);
     }
 
     @Delete('deleteExam')
-    @Roles('teacher')
     deleteExam(
-        @Body()
-        body: any,
-        @Req() req: any,
+        @Body() body: any,
+        @CurrentUser() user: any,
     ) {
-        return this.teacherService.deleteExam(body, req);
+        return this.teacherService.deleteExam(body, user.id);
     }
 
     @Put('updateQuestion')
     updateQuestion(
         @Body() body: any,
-        @Req() req: any
+        @CurrentUser() user: any,
     ) {
-        return this.teacherService.updateQuestion(body, req);
+        return this.teacherService.updateQuestion(body, user.id);
     }
 
     @Put('updateExam')
     updateExam(
         @Body() body: any,
-        @Req() req: any
+        @CurrentUser() user: any,
     ) {
-        return this.teacherService.updateExam(body, req);
+        return this.teacherService.updateExam(body, user.id);
     }
 
     @Get('getDashboard')
-     getDashboard(
-        @Req() req: any
-    ) {
-        return this.teacherService.getDashboard(req);
+    getDashboard(@CurrentUser() user: any) {
+        return this.teacherService.getDashboard(user.id);
     }
 
     @Get('getAllExams')
-    getAllExams(
-        @Req() req: any
-    ) {
-        return this.teacherService.getAllExams(req);
+    getAllExams(@CurrentUser() user: any) {
+        return this.teacherService.getAllExams(user.id);
     }
 
     @Get('getAllQuestions')
-    getAllQuestions(
-        @Req() req: any
-    ) {
-        return this.teacherService.getAllQuestions(req);
+    getAllQuestions(@CurrentUser() user: any) {
+        return this.teacherService.getAllQuestions(user.id);
     }
 
     @Get('getExam/:id')
     getExam(
         @Param('id') id: string,
-        @Req() req: any
+        @CurrentUser() user: any,
     ) {
-        return this.teacherService.getExam(Number(id), req);
+        return this.teacherService.getExam(Number(id), user.id);
     }
 }
