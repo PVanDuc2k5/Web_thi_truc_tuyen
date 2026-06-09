@@ -81,7 +81,7 @@ export class StudentService {
       if (isCorrect) correctCount++;
     });
     
-    const score = Math.round((correctCount / totalQuestions) * 10 * 100) / 100; 
+    const score = Math.round((correctCount / totalQuestions) * 10);
     console.log(`✅ Chấm xong! Số câu đúng: ${correctCount}/${totalQuestions} | Điểm số: ${score}`);
 
     // 3. Lưu tổng quát vào bảng results
