@@ -170,6 +170,8 @@ export default function MyExams() {
         <Tabs
           value={filterStatus}
           onChange={(_, newValue) => setFilterStatus(newValue)}
+          variant="scrollable"
+          scrollButtons="auto"
           sx={{ mb: 2 }}
         >
           <Tab key="all" label="All" value="all" />
