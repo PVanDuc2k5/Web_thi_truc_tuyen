@@ -4,14 +4,12 @@ import { useAuthStore } from '../../../lib/auth-store';
 import apiClient from '../../../lib/api-client';
 import {
   Box, Typography, Paper, RadioGroup, FormControlLabel, Radio,
-  Button, LinearProgress, Card, CardContent, CircularProgress
+  Button, LinearProgress, Card, CardContent, CircularProgress,
+  Dialog, DialogTitle, DialogContent, DialogActions, Divider
 } from '@mui/material';
-import { NavigateBefore, NavigateNext, Send } from '@mui/icons-material';
-
-// Import supabase để kiểm tra điểm cũ
+import { NavigateBefore, NavigateNext, Send, Warning, CheckCircleOutline } from '@mui/icons-material';
 import { supabase } from '../../../lib/supabase';
 
-// Định nghĩa Types chuẩn với Backend
 interface Answer { id: number; content: string; }
 interface Question { id: number; content: string; answers: Answer[]; }
 interface Exam { id: number; title: string; duration: number; }
@@ -23,22 +21,18 @@ export default function ExamPage() {
   
   const [tabSwitches, setTabSwitches] = useState(0);
   const tabSwitchesRef = useRef(0);
+  const lastViolationTime = useRef<number>(0);
   
-  // Đảm bảo luôn có ID để làm key lưu LocalStorage
   const safeExamId = examId || "1";
   const draftKey = `exam_draft_${safeExamId}`;
   const timeKey = `exam_time_${safeExamId}`;
 
-  // State quản lý Data từ API
   const [exam, setExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // State quản lý luồng thi
   const [currentQuestion, setCurrentQuestion] = useState(0);
   
-  // 1. Khởi tạo Đáp án từ LocalStorage (Nếu có)
   const [answers, setAnswers] = useState<{ [key: number]: number }>(() => {
     const savedAnswers = localStorage.getItem(draftKey);
     return savedAnswers ? JSON.parse(savedAnswers) : {};
@@ -48,54 +42,62 @@ export default function ExamPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ score: number, correctCount: number, totalQuestions: number } | null>(null);
 
+  // Modal/Dialog states
+  const [warningOpen, setWarningOpen] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+  const [interactionWarningOpen, setInteractionWarningOpen] = useState(false);
+  const [interactionWarningMessage, setInteractionWarningMessage] = useState('');
+
   const answersRef = useRef(answers);
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
 
+  const isSubmittingRef = useRef(isSubmitting);
+  useEffect(() => {
+    isSubmittingRef.current = isSubmitting;
+  }, [isSubmitting]);
+
+  const resultRef = useRef(result);
+  useEffect(() => {
+    resultRef.current = result;
+  }, [result]);
+
   const handleSubmitRef = useRef<any>(null);
 
-  // Lấy dữ liệu bài thi khi mở trang VÀ KIỂM TRA ĐÃ THI CHƯA
+  // Fetch exam data and security checks
   useEffect(() => {
     const fetchExamData = async () => {
       try {
-        // --- BẮT ĐẦU ĐOẠN KIỂM TRA BẢO MẬT ---
-        const user = useAuthStore.getState().user;
+        const currentUser = useAuthStore.getState().user;
 
-        if (user) {
-          // Check xem trong DB có điểm của người này cho đề này chưa
-          const { data: existingResult, error: checkError } = await supabase
+        if (currentUser) {
+          const { data: existingResult } = await supabase
             .from('results')
             .select('id')
-            .eq('user_id', user.id)
+            .eq('user_id', currentUser.id)
             .eq('exam_id', safeExamId)
-            .single(); // Tìm 1 kết quả duy nhất
+            .single();
 
-          // Nếu tìm thấy điểm (nghĩa là đã thi rồi)
           if (existingResult) {
-            alert('Bạn đã hoàn thành bài thi này rồi! Hệ thống không cho phép thi lại.');
-            navigate('/student'); // Đá văng về trang chủ
-            return; // Dừng lập tức, không chạy phần code lấy đề bên dưới nữa
+            // If already submitted, redirect directly to result details sheet
+            navigate(`/student/result/${safeExamId}`);
+            return;
           }
         }
-        // --- KẾT THÚC ĐOẠN KIỂM TRA BẢO MẬT ---
 
-        // Nếu chưa thi thì tiếp tục gọi Backend lấy đề thi
         const { data } = await apiClient.get(`/student/exam/${safeExamId}`);
-        
         setExam(data.exam);
         setQuestions(data.questions);
 
-        // 2. Phục hồi thời gian: Nếu có thời gian cũ thì dùng, không thì lấy thời gian gốc của đề
         const savedTime = localStorage.getItem(timeKey);
         if (savedTime) {
           setTimeLeft(parseInt(savedTime, 10));
         } else {
-          setTimeLeft(data.exam.duration * 60); // Đổi phút ra giây
+          setTimeLeft(data.exam.duration * 60);
         }
-
       } catch (err: any) {
-        // Bỏ qua lỗi "No rows found" của .single() vì nó có nghĩa là học sinh CHƯA THI (điều tốt)
         if (err.code !== 'PGRST116') {
           setError(err.message);
         }
@@ -105,24 +107,23 @@ export default function ExamPage() {
     };
     
     fetchExamData();
-  }, [safeExamId, timeKey, navigate]); // Thêm navigate vào mảng phụ thuộc cho chuẩn React
+  }, [safeExamId, timeKey, navigate]);
 
-  // 3. THEO DÕI VÀ LƯU TRỮ LIÊN TỤC
-  // Lưu đáp án mỗi khi học sinh tích chọn
+  // Sync draft answers
   useEffect(() => {
     if (Object.keys(answers).length > 0) {
       localStorage.setItem(draftKey, JSON.stringify(answers));
     }
   }, [answers, draftKey]);
 
-  // Lưu thời gian mỗi khi đồng hồ nhảy (Bỏ qua lúc đang loading hoặc time = 0)
+  // Sync time remaining
   useEffect(() => {
     if (!loading && timeLeft > 0) {
       localStorage.setItem(timeKey, timeLeft.toString());
     }
   }, [timeLeft, timeKey, loading]);
 
-  // Logic Đồng hồ đếm ngược
+  // Timer countdown loop
   useEffect(() => {
     if (loading || timeLeft <= 0 || result || isSubmitting) return;
 
@@ -131,7 +132,7 @@ export default function ExamPage() {
         if (prev <= 1) {
           clearInterval(timer);
           if (handleSubmitRef.current) {
-            handleSubmitRef.current(true); // Hết giờ tự động nộp
+            handleSubmitRef.current(true);
           }
           return 0;
         }
@@ -142,32 +143,57 @@ export default function ExamPage() {
     return () => clearInterval(timer);
   }, [loading, result, isSubmitting]);
 
-  // Cảnh báo chống gian lận (anti-cheating listeners)
+  // Anti-cheating event handlers
   useEffect(() => {
     if (loading || result || isSubmitting) return;
 
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      alert('Không được phép sử dụng chuột phải trong quá trình làm bài thi!');
-    };
+    const triggerViolation = () => {
+      if (isSubmittingRef.current || resultRef.current) return;
+      
+      const now = Date.now();
+      // 2-second cooldown to block multi-blur focus issues
+      if (now - lastViolationTime.current < 2000) return;
+      lastViolationTime.current = now;
 
-    const handleCopyPaste = (e: ClipboardEvent) => {
-      e.preventDefault();
-      alert('Không được phép sao chép hoặc dán nội dung trong quá trình làm bài thi!');
-    };
-
-    const handleBlur = () => {
       tabSwitchesRef.current += 1;
       const count = tabSwitchesRef.current;
       setTabSwitches(count);
       
       if (count >= 3) {
-        alert('CẢNH BÁO CỰC KỲ NGHIÊM TRỌNG: Bạn đã chuyển tab 3 lần. Bài thi sẽ tự động được nộp ngay bây giờ!');
+        setWarningMessage('CẢNH BÁO CỰC KỲ NGHIÊM TRỌNG: Bạn đã rời khỏi phòng thi hoặc chuyển tab 3 lần. Bài thi sẽ tự động được nộp ngay bây giờ!');
+        setWarningOpen(true);
         if (handleSubmitRef.current) {
           handleSubmitRef.current(true);
         }
       } else {
-        alert(`CẢNH BÁO CHỐNG GIAN LẬN: Bạn không được chuyển tab hoặc rời màn hình làm bài! (Số lần vi phạm: ${count}/3)`);
+        setWarningMessage(`CẢNH BÁO CHỐNG GIAN LẬN: Bạn không được phép chuyển tab hoặc rời màn hình làm bài! (Số lần vi phạm: ${count}/3)`);
+        setWarningOpen(true);
+      }
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      setInteractionWarningMessage('Không được phép sử dụng chuột phải trong quá trình làm bài thi!');
+      setInteractionWarningOpen(true);
+    };
+
+    const handleCopyPaste = (e: ClipboardEvent) => {
+      e.preventDefault();
+      setInteractionWarningMessage('Không được phép sao chép hoặc dán nội dung trong quá trình làm bài thi!');
+      setInteractionWarningOpen(true);
+    };
+
+    const handleBlur = () => {
+      setTimeout(() => {
+        if (!document.hasFocus()) {
+          triggerViolation();
+        }
+      }, 200);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        triggerViolation();
       }
     };
 
@@ -175,32 +201,33 @@ export default function ExamPage() {
     window.addEventListener('copy', handleCopyPaste);
     window.addEventListener('paste', handleCopyPaste);
     window.addEventListener('blur', handleBlur);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       window.removeEventListener('contextmenu', handleContextMenu);
       window.removeEventListener('copy', handleCopyPaste);
       window.removeEventListener('paste', handleCopyPaste);
       window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [loading, result, isSubmitting]);
 
-  // Hàm Nộp bài gọi API Backend
+  // Submit action handler
   const handleSubmit = async (isForced = false) => {
     if (!exam || isSubmitting) return;
 
-    // Lấy thông tin user từ Zustand auth store
     if (!user) {
-      alert('Lỗi: Không tìm thấy thông tin sinh viên. Vui lòng quay lại trang Đăng nhập!');
+      setInteractionWarningMessage('Lỗi: Không tìm thấy thông tin sinh viên. Vui lòng quay lại trang Đăng nhập!');
+      setInteractionWarningOpen(true);
       navigate('/');
       return;
     }
     
     const forced = isForced === true;
     
-    // Nếu không phải nộp ép buộc và còn thời gian, hỏi xác nhận
     if (!forced && timeLeft > 0) {
-      const isConfirm = window.confirm('Bạn có chắc chắn muốn nộp bài?');
-      if (!isConfirm) return;
+      setSubmitDialogOpen(true);
+      return;
     }
 
     setIsSubmitting(true);
@@ -220,17 +247,15 @@ export default function ExamPage() {
       const { data } = await apiClient.post('/student/submit', payload);
       setResult(data);
 
-      // 4. DỌN DẸP HIỆN TRƯỜNG: Nộp thành công thì xóa file nháp
       localStorage.removeItem(draftKey);
       localStorage.removeItem(timeKey);
-
     } catch (error) {
-      alert('Có lỗi xảy ra khi nộp bài!');
+      setInteractionWarningMessage('Có lỗi xảy ra khi nộp bài!');
+      setInteractionWarningOpen(true);
       setIsSubmitting(false);
     }
   };
 
-  // Đồng bộ handleSubmitRef
   useEffect(() => {
     handleSubmitRef.current = handleSubmit;
   }, [handleSubmit]);
@@ -245,7 +270,7 @@ export default function ExamPage() {
   if (error) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'error.main', typography: 'h6' }}>{error}</Box>;
   if (questions.length === 0) return <Box sx={{ p: 4, textAlign: 'center' }}>Chưa có câu hỏi nào trong đề này.</Box>;
 
-  // MÀN HÌNH KẾT QUẢ
+  // Result view layout
   if (result) {
     return (
       <Box sx={{ maxWidth: 600, mx: 'auto', mt: 8, p: 4, textAlign: 'center', bgcolor: 'white', borderRadius: 2, boxShadow: 3, border: '1px solid #e0e0e0' }}>
@@ -271,13 +296,12 @@ export default function ExamPage() {
     );
   }
 
-  // MÀN HÌNH LÀM BÀI
   const progress = ((currentQuestion + 1) / questions.length) * 100;
   const currentQ = questions[currentQuestion];
 
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
-      {/* Header Đếm ngược */}
+      {/* Header Panel */}
       <Card elevation={3} sx={{ mb: 3, backgroundColor: 'rgb(22, 119, 185)', color: 'white' }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -299,7 +323,7 @@ export default function ExamPage() {
         </CardContent>
       </Card>
 
-      {/* Vùng câu hỏi */}
+      {/* Question sheet container */}
       <Paper elevation={2} sx={{ p: 4, minHeight: '55vh', display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ mb: 4 }}>
           <LinearProgress variant="determinate" value={progress} sx={{ height: 8, borderRadius: 4, mb: 1, '& .MuiLinearProgress-bar': { backgroundColor: 'rgb(22, 119, 185)' } }} />
@@ -338,7 +362,7 @@ export default function ExamPage() {
           ))}
         </RadioGroup>
 
-        {/* Nút điều hướng */}
+        {/* Navigation buttons */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
           <Button
             variant="outlined"
@@ -372,6 +396,108 @@ export default function ExamPage() {
           )}
         </Box>
       </Paper>
+
+      {/* Cheating Violation warning Dialog */}
+      <Dialog 
+        open={warningOpen} 
+        onClose={() => setWarningOpen(false)}
+        PaperProps={{
+          sx: { borderRadius: 3, p: 2, maxWidth: 450 }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main', fontWeight: 700 }}>
+          <Warning sx={{ fontSize: 32 }} /> Cảnh báo Vi phạm
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ color: '#334155', lineHeight: 1.6 }}>
+            {warningMessage}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
+          <Button 
+            variant="contained" 
+            color="error"
+            onClick={() => setWarningOpen(false)}
+            sx={{ px: 4, py: 1, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+          >
+            Tôi đã hiểu và cam kết không vi phạm
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Submit Confirmation Dialog */}
+      <Dialog 
+        open={submitDialogOpen} 
+        onClose={() => setSubmitDialogOpen(false)}
+        PaperProps={{
+          sx: { borderRadius: 3, p: 2, maxWidth: 400 }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: '#0f172a' }}>
+          Xác nhận Nộp bài
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+            Bạn có chắc chắn muốn nộp bài thi này không? Hãy chắc chắn bạn đã rà soát kỹ tất cả các câu trả lời.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button 
+            variant="outlined" 
+            onClick={() => setSubmitDialogOpen(false)}
+            sx={{ flex: 1, py: 1, borderRadius: 2, textTransform: 'none', fontWeight: 600, color: '#64748b', borderColor: '#e2e8f0' }}
+          >
+            Làm tiếp
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={() => {
+              setSubmitDialogOpen(false);
+              void handleSubmit(true);
+            }}
+            sx={{ 
+              flex: 1, 
+              py: 1, 
+              borderRadius: 2, 
+              textTransform: 'none', 
+              fontWeight: 600,
+              background: 'linear-gradient(90deg, #4f46e5 0%, #6366f1 100%)',
+              '&:hover': {
+                background: 'linear-gradient(90deg, #4338ca 0%, #4f46e5 100%)',
+              }
+            }}
+          >
+            Nộp bài
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Custom Copy/Paste/Context Warning Dialog */}
+      <Dialog 
+        open={interactionWarningOpen} 
+        onClose={() => setInteractionWarningOpen(false)}
+        PaperProps={{
+          sx: { borderRadius: 3, p: 2, maxWidth: 400 }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'warning.main', fontWeight: 700 }}>
+          <Warning sx={{ fontSize: 28 }} /> Hành động bị hạn chế
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+            {interactionWarningMessage}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
+          <Button 
+            variant="contained" 
+            onClick={() => setInteractionWarningOpen(false)}
+            sx={{ px: 4, py: 1, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+          >
+            Đồng ý
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
