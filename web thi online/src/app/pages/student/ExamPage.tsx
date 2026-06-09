@@ -98,9 +98,8 @@ export default function ExamPage() {
           setTimeLeft(data.exam.duration * 60);
         }
       } catch (err: any) {
-        if (err.code !== 'PGRST116') {
-          setError(err.message);
-        }
+        const errorMsg = err.response?.data?.message || err.message || 'Có lỗi xảy ra khi tải đề thi';
+        setError(errorMsg);
       } finally {
         setLoading(false);
       }

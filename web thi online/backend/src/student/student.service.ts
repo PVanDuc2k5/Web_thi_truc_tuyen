@@ -18,7 +18,7 @@ export class StudentService {
     const { data, error } = await this.supabase
       .from('exams')
       .select(`
-        id, title, duration, start_time, end_time,
+        id, title, duration, start_time, end_time, status,
         exam_questions (
           questions (
             id, content,
@@ -31,6 +31,10 @@ export class StudentService {
 
     if (error || !data) {
       throw new HttpException('Không tìm thấy đề thi', HttpStatus.NOT_FOUND);
+    }
+
+    if (data.status === 'draft') {
+      throw new HttpException('Đề thi này hiện đang là bản nháp và chưa được công bố!', HttpStatus.FORBIDDEN);
     }
 
     const now = new Date().getTime();

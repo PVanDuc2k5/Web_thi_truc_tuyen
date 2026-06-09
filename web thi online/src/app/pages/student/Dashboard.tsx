@@ -136,12 +136,17 @@ export default function StudentDashboard() {
     try {
       const { data: exam, error } = await supabase
         .from('exams')
-        .select('id, title, start_time, end_time')
+        .select('id, title, start_time, end_time, status')
         .eq('code', examCode.toUpperCase())
         .single();
 
       if (error || !exam) {
         setJoinError('Mã đề thi không tồn tại. Vui lòng kiểm tra lại!');
+        return;
+      }
+
+      if (exam.status === 'draft') {
+        setJoinError('Đề thi này hiện đang ở chế độ bản nháp và chưa được công bố!');
         return;
       }
 
