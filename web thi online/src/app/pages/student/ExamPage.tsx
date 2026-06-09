@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useAuthStore } from '../../../lib/auth-store';
 import apiClient from '../../../lib/api-client';
@@ -20,6 +20,9 @@ export default function ExamPage() {
   const navigate = useNavigate();
   const { examId } = useParams();
   const { user } = useAuthStore();
+  
+  const [tabSwitches, setTabSwitches] = useState(0);
+  const tabSwitchesRef = useRef(0);
   
   // Đảm bảo luôn có ID để làm key lưu LocalStorage
   const safeExamId = examId || "1";
@@ -44,6 +47,13 @@ export default function ExamPage() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ score: number, correctCount: number, totalQuestions: number } | null>(null);
+
+  const answersRef = useRef(answers);
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  const handleSubmitRef = useRef<any>(null);
 
   // Lấy dữ liệu bài thi khi mở trang VÀ KIỂM TRA ĐÃ THI CHƯA
   useEffect(() => {
@@ -120,7 +130,9 @@ export default function ExamPage() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          handleSubmit(); // Hết giờ tự động nộp
+          if (handleSubmitRef.current) {
+            handleSubmitRef.current(true); // Hết giờ tự động nộp
+          }
           return 0;
         }
         return prev - 1;
@@ -130,23 +142,71 @@ export default function ExamPage() {
     return () => clearInterval(timer);
   }, [loading, result, isSubmitting]);
 
+  // Cảnh báo chống gian lận (anti-cheating listeners)
+  useEffect(() => {
+    if (loading || result || isSubmitting) return;
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      alert('Không được phép sử dụng chuột phải trong quá trình làm bài thi!');
+    };
+
+    const handleCopyPaste = (e: ClipboardEvent) => {
+      e.preventDefault();
+      alert('Không được phép sao chép hoặc dán nội dung trong quá trình làm bài thi!');
+    };
+
+    const handleBlur = () => {
+      tabSwitchesRef.current += 1;
+      const count = tabSwitchesRef.current;
+      setTabSwitches(count);
+      
+      if (count >= 3) {
+        alert('CẢNH BÁO CỰC KỲ NGHIÊM TRỌNG: Bạn đã chuyển tab 3 lần. Bài thi sẽ tự động được nộp ngay bây giờ!');
+        if (handleSubmitRef.current) {
+          handleSubmitRef.current(true);
+        }
+      } else {
+        alert(`CẢNH BÁO CHỐNG GIAN LẬN: Bạn không được chuyển tab hoặc rời màn hình làm bài! (Số lần vi phạm: ${count}/3)`);
+      }
+    };
+
+    window.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('copy', handleCopyPaste);
+    window.addEventListener('paste', handleCopyPaste);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('copy', handleCopyPaste);
+      window.removeEventListener('paste', handleCopyPaste);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [loading, result, isSubmitting]);
+
   // Hàm Nộp bài gọi API Backend
-  const handleSubmit = async () => {
+  const handleSubmit = async (isForced = false) => {
     if (!exam || isSubmitting) return;
 
     // Lấy thông tin user từ Zustand auth store
-    const user = useAuthStore.getState().user;
     if (!user) {
       alert('Lỗi: Không tìm thấy thông tin sinh viên. Vui lòng quay lại trang Đăng nhập!');
       navigate('/');
       return;
     }
     
-    // Bỏ qua bước confirm để nộp bài ngay lập tức
+    const forced = isForced === true;
+    
+    // Nếu không phải nộp ép buộc và còn thời gian, hỏi xác nhận
+    if (!forced && timeLeft > 0) {
+      const isConfirm = window.confirm('Bạn có chắc chắn muốn nộp bài?');
+      if (!isConfirm) return;
+    }
 
     setIsSubmitting(true);
     try {
-      const answersPayload = Object.entries(answers).map(([qId, aId]) => ({
+      const currentAnswers = answersRef.current;
+      const answersPayload = Object.entries(currentAnswers).map(([qId, aId]) => ({
         questionId: Number(qId),
         answerId: Number(aId)
       }));
@@ -169,6 +229,11 @@ export default function ExamPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Đồng bộ handleSubmitRef
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  }, [handleSubmit]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -289,7 +354,7 @@ export default function ExamPage() {
             <Button
               variant="contained"
               endIcon={<Send />}
-              onClick={handleSubmit}
+              onClick={() => handleSubmit(false)}
               disabled={isSubmitting}
               sx={{ backgroundColor: 'rgb(22, 119, 185)', '&:hover': { backgroundColor: 'rgb(18, 95, 148)' } }}
             >
