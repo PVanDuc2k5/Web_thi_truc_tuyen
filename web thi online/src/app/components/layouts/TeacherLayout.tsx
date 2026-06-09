@@ -49,7 +49,7 @@ export default function TeacherLayout() {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Teacher Dashboard
           </Typography>
-          <UserDropdown username="teacher_user" role="teacher" />
+          <UserDropdown />
         </Toolbar>
       </AppBar>
 

@@ -20,6 +20,7 @@ import { PlayArrow, CheckCircle, Schedule, Search, VpnKey, Add } from '@mui/icon
 
 // Import supabase từ thư mục lib
 import { supabase } from '../../../lib/supabase';
+import { useAuthStore } from '../../../lib/auth-store';
 
 // Khai báo kiểu dữ liệu cho Exam để code không báo lỗi
 interface Exam {
@@ -66,7 +67,7 @@ export default function StudentDashboard() {
         const { data: resultsData, error: resultsError } = await supabase
           .from('results')
           .select('exam_id')
-          .eq('user_id', currentUser.id);
+          .eq('user_id', user.id);
 
         if (resultsError) {
           console.error("Lỗi lấy điểm:", resultsError);

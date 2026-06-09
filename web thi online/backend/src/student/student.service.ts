@@ -50,7 +50,7 @@ export class StudentService {
   }
 
   // API 2: THÊM MỚI - Nộp bài, chấm tự động và lưu kết quả
-  async submitExam(userId: number, examId: number, userAnswers: { questionId: number, answerId: number }[]) {
+  async submitExam(userId: string, examId: number, userAnswers: { questionId: number, answerId: number }[]) {
     // 🟢 HỆ THỐNG ĐỊNH VỊ: In ra Terminal để biết Backend đang chạy
     console.log(`\n🚀 [BẮT ĐẦU CHẤM BÀI] Học sinh ID: ${userId} | Đề thi ID: ${examId}`);
     console.log(`📥 Nhận được ${userAnswers.length} câu trả lời từ Frontend...`);

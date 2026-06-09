@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { useAuthStore } from '../../../lib/auth-store';
+import apiClient from '../../../lib/api-client';
 import {
   Box, Typography, Paper, RadioGroup, FormControlLabel, Radio,
   Button, LinearProgress, Card, CardContent, CircularProgress
@@ -134,13 +136,10 @@ export default function ExamPage() {
   const handleSubmit = async () => {
     if (!exam || isSubmitting) return;
 
-    // Lấy thông tin user thật từ localStorage
-    const savedUser = localStorage.getItem('currentUser');
-    const currentUser = savedUser ? JSON.parse(savedUser) : null;
-
-    if (!currentUser) {
+    // Lấy thông tin user từ Zustand auth store
+    if (!user) {
       alert('Lỗi: Không tìm thấy thông tin sinh viên. Vui lòng quay lại trang Đăng nhập!');
-      navigate('/login');
+      navigate('/');
       return;
     }
     
@@ -163,14 +162,7 @@ export default function ExamPage() {
         answers: answersPayload
       };
 
-      const response = await fetch('http://localhost:3001/student/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) throw new Error('Lỗi chấm điểm');
-      const data = await response.json();
+      const { data } = await apiClient.post('/student/submit', payload);
       setResult(data);
 
       // 4. DỌN DẸP HIỆN TRƯỜNG: Nộp thành công thì xóa file nháp

@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import ProtectedRoute from './components/ProtectedRoute';
 import TeacherLayout from './components/layouts/TeacherLayout';
 import StudentLayout from './components/layouts/StudentLayout';
 import TeacherDashboard from './pages/teacher/Dashboard';
@@ -26,7 +27,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/teacher',
-    Component: TeacherLayout,
+    element: <ProtectedRoute allowedRoles={['teacher']} />,
     children: [
       { index: true, Component: TeacherDashboard },
       { path: 'my-exams', Component: MyExams },
@@ -38,7 +39,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/student',
-    Component: StudentLayout,
+    element: <ProtectedRoute allowedRoles={['student']} />,
     children: [
       { index: true, Component: StudentDashboard },
       { path: 'results', Component: MyResults },
