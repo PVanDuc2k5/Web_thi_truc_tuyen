@@ -29,12 +29,17 @@ export const router = createBrowserRouter([
     path: '/teacher',
     element: <ProtectedRoute allowedRoles={['teacher']} />,
     children: [
-      { index: true, Component: TeacherDashboard },
-      { path: 'my-exams', Component: MyExams },
-      { path: 'questions', Component: QuestionManagement },
-      { path: 'exam-builder', Component: ExamBuilder },
-      { path: 'exam/:examId', Component: ExamDetail },
-      { path: 'profile', Component: TeacherProfilePage },
+      {
+        element: <TeacherLayout />,
+        children: [
+          { index: true, Component: TeacherDashboard },
+          { path: 'my-exams', Component: MyExams },
+          { path: 'questions', Component: QuestionManagement },
+          { path: 'exam-builder', Component: ExamBuilder },
+          { path: 'exam/:examId', Component: ExamDetail },
+          { path: 'profile', Component: TeacherProfilePage },
+        ],
+      },
     ],
   },
   {
