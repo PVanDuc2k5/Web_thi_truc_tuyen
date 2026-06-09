@@ -19,6 +19,7 @@ interface Exam { id: number; title: string; duration: number; }
 export default function ExamPage() {
   const navigate = useNavigate();
   const { examId } = useParams();
+  const { user } = useAuthStore();
   
   // Đảm bảo luôn có ID để làm key lưu LocalStorage
   const safeExamId = examId || "1";
@@ -49,22 +50,19 @@ export default function ExamPage() {
     const fetchExamData = async () => {
       try {
         // --- BẮT ĐẦU ĐOẠN KIỂM TRA BẢO MẬT ---
-        const savedUser = localStorage.getItem('currentUser');
-        const currentUser = savedUser ? JSON.parse(savedUser) : null;
-        
-        if (currentUser) {
+        if (user) {
           // Check xem trong DB có điểm của người này cho đề này chưa
           const { data: existingResult, error: checkError } = await supabase
             .from('results')
             .select('id')
-            .eq('user_id', currentUser.id)
+            .eq('user_id', user.id)
             .eq('exam_id', safeExamId)
             .single(); // Tìm 1 kết quả duy nhất
 
           // Nếu tìm thấy điểm (nghĩa là đã thi rồi)
           if (existingResult) {
             alert('Bạn đã hoàn thành bài thi này rồi! Hệ thống không cho phép thi lại.');
-            navigate('/student/dashboard'); // Đá văng về trang chủ
+            navigate('/student'); // Đá văng về trang chủ
             return; // Dừng lập tức, không chạy phần code lấy đề bên dưới nữa
           }
         }
@@ -157,7 +155,7 @@ export default function ExamPage() {
       }));
 
       const payload = {
-        userId: currentUser.id,
+        userId: user.id,
         examId: exam.id,
         answers: answersPayload
       };
@@ -196,9 +194,17 @@ export default function ExamPage() {
           Số câu đúng: <strong>{result.correctCount} / {result.totalQuestions}</strong>
         </Typography>
         <Typography variant="body1" color="text.secondary">Điểm tổng kết:</Typography>
-        <Typography variant="h1" fontWeight={900} sx={{ color: 'rgb(22, 119, 185)', mt: 1 }}>
+        <Typography variant="h1" fontWeight={900} sx={{ color: 'rgb(22, 119, 185)', mt: 1, mb: 4 }}>
           {result.score}
         </Typography>
+        <Button
+          variant="contained"
+          size="large"
+          onClick={() => navigate('/student')}
+          sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', px: 4, py: 1.5 }}
+        >
+          Quay lại Trang chủ
+        </Button>
       </Box>
     );
   }
