@@ -8,6 +8,9 @@ import {
 } from '@mui/material';
 import { NavigateBefore, NavigateNext, Send } from '@mui/icons-material';
 
+// Import supabase để kiểm tra điểm cũ
+import { supabase } from '../../../lib/supabase';
+
 // Định nghĩa Types chuẩn với Backend
 interface Answer { id: number; content: string; }
 interface Question { id: number; content: string; answers: Answer[]; }
@@ -16,7 +19,11 @@ interface Exam { id: number; title: string; duration: number; }
 export default function ExamPage() {
   const navigate = useNavigate();
   const { examId } = useParams();
-  const { user } = useAuthStore();
+  
+  // Đảm bảo luôn có ID để làm key lưu LocalStorage
+  const safeExamId = examId || "1";
+  const draftKey = `exam_draft_${safeExamId}`;
+  const timeKey = `exam_time_${safeExamId}`;
 
   // State quản lý Data từ API
   const [exam, setExam] = useState<Exam | null>(null);
@@ -26,28 +33,86 @@ export default function ExamPage() {
 
   // State quản lý luồng thi
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<{ [key: number]: number }>({});
+  
+  // 1. Khởi tạo Đáp án từ LocalStorage (Nếu có)
+  const [answers, setAnswers] = useState<{ [key: number]: number }>(() => {
+    const savedAnswers = localStorage.getItem(draftKey);
+    return savedAnswers ? JSON.parse(savedAnswers) : {};
+  });
+  
   const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ score: number, correctCount: number, totalQuestions: number } | null>(null);
 
-  // Lấy dữ liệu bài thi khi mở trang
+  // Lấy dữ liệu bài thi khi mở trang VÀ KIỂM TRA ĐÃ THI CHƯA
   useEffect(() => {
     const fetchExamData = async () => {
       try {
-        const id = examId || "1";
-        const { data } = await apiClient.get(`/student/exam/${id}`);
+        // --- BẮT ĐẦU ĐOẠN KIỂM TRA BẢO MẬT ---
+        const savedUser = localStorage.getItem('currentUser');
+        const currentUser = savedUser ? JSON.parse(savedUser) : null;
+        
+        if (currentUser) {
+          // Check xem trong DB có điểm của người này cho đề này chưa
+          const { data: existingResult, error: checkError } = await supabase
+            .from('results')
+            .select('id')
+            .eq('user_id', currentUser.id)
+            .eq('exam_id', safeExamId)
+            .single(); // Tìm 1 kết quả duy nhất
+
+          // Nếu tìm thấy điểm (nghĩa là đã thi rồi)
+          if (existingResult) {
+            alert('Bạn đã hoàn thành bài thi này rồi! Hệ thống không cho phép thi lại.');
+            navigate('/student/dashboard'); // Đá văng về trang chủ
+            return; // Dừng lập tức, không chạy phần code lấy đề bên dưới nữa
+          }
+        }
+        // --- KẾT THÚC ĐOẠN KIỂM TRA BẢO MẬT ---
+
+        // Nếu chưa thi thì tiếp tục gọi Backend lấy đề thi
+        const response = await fetch(`http://localhost:3001/student/exam/${safeExamId}`);
+        if (!response.ok) throw new Error('Không tìm thấy đề thi (DB trống)');
+        
+        const data = await response.json();
         setExam(data.exam);
         setQuestions(data.questions);
-        setTimeLeft(data.exam.duration * 60);
+
+        // 2. Phục hồi thời gian: Nếu có thời gian cũ thì dùng, không thì lấy thời gian gốc của đề
+        const savedTime = localStorage.getItem(timeKey);
+        if (savedTime) {
+          setTimeLeft(parseInt(savedTime, 10));
+        } else {
+          setTimeLeft(data.exam.duration * 60); // Đổi phút ra giây
+        }
+
       } catch (err: any) {
-        setError(err.message);
+        // Bỏ qua lỗi "No rows found" của .single() vì nó có nghĩa là học sinh CHƯA THI (điều tốt)
+        if (err.code !== 'PGRST116') {
+          setError(err.message);
+        }
       } finally {
         setLoading(false);
       }
     };
+    
     fetchExamData();
-  }, [examId]);
+  }, [safeExamId, timeKey, navigate]); // Thêm navigate vào mảng phụ thuộc cho chuẩn React
+
+  // 3. THEO DÕI VÀ LƯU TRỮ LIÊN TỤC
+  // Lưu đáp án mỗi khi học sinh tích chọn
+  useEffect(() => {
+    if (Object.keys(answers).length > 0) {
+      localStorage.setItem(draftKey, JSON.stringify(answers));
+    }
+  }, [answers, draftKey]);
+
+  // Lưu thời gian mỗi khi đồng hồ nhảy (Bỏ qua lúc đang loading hoặc time = 0)
+  useEffect(() => {
+    if (!loading && timeLeft > 0) {
+      localStorage.setItem(timeKey, timeLeft.toString());
+    }
+  }, [timeLeft, timeKey, loading]);
 
   // Logic Đồng hồ đếm ngược
   useEffect(() => {
@@ -92,12 +157,18 @@ export default function ExamPage() {
       }));
 
       const payload = {
+        userId: currentUser.id,
         examId: exam.id,
         answers: answersPayload
       };
 
       const { data } = await apiClient.post('/student/submit', payload);
       setResult(data);
+
+      // 4. DỌN DẸP HIỆN TRƯỜNG: Nộp thành công thì xóa file nháp
+      localStorage.removeItem(draftKey);
+      localStorage.removeItem(timeKey);
+
     } catch (error) {
       alert('Có lỗi xảy ra khi nộp bài!');
       setIsSubmitting(false);
