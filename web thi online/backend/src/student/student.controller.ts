@@ -1,7 +1,13 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { SupabaseAuthGuard } from '../guards/supabase-auth.guard';
+import { Roles } from '../decorators/roles.decorator';
+import { RolesGuard } from '../guards/roles.guard';
+import { CurrentUser } from '../decorators/user.decorator';
 import { StudentService } from './student.service';
 
 @Controller('student')
+@UseGuards(SupabaseAuthGuard, RolesGuard)
+@Roles('student')
 export class StudentController {
   constructor(private readonly studentService: StudentService) {}
 
@@ -13,8 +19,9 @@ export class StudentController {
   // THÊM API NỘP BÀI
   @Post('submit')
   async submitExam(
-    @Body() body: { userId: number, examId: number, answers: { questionId: number, answerId: number }[] }
+    @Body() body: { examId: number, answers: { questionId: number, answerId: number }[] },
+    @CurrentUser() user: any
   ) {
-    return this.studentService.submitExam(body.userId, body.examId, body.answers);
+    return this.studentService.submitExam(user.id, body.examId, body.answers);
   }
 }
