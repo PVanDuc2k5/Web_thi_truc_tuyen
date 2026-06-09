@@ -5,7 +5,7 @@ import apiClient from '../../../lib/api-client';
 import {
   Box, Typography, Paper, RadioGroup, FormControlLabel, Radio,
   Button, LinearProgress, Card, CardContent, CircularProgress,
-  Dialog, DialogTitle, DialogContent, DialogActions, Divider
+  Dialog, DialogTitle, DialogContent, DialogActions, Divider, Grid
 } from '@mui/material';
 import { NavigateBefore, NavigateNext, Send, Warning, CheckCircleOutline } from '@mui/icons-material';
 import { supabase } from '../../../lib/supabase';
@@ -270,7 +270,6 @@ export default function ExamPage() {
   if (error) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'error.main', typography: 'h6' }}>{error}</Box>;
   if (questions.length === 0) return <Box sx={{ p: 4, textAlign: 'center' }}>Chưa có câu hỏi nào trong đề này.</Box>;
 
-  // Result view layout
   if (result) {
     return (
       <Box sx={{ maxWidth: 600, mx: 'auto', mt: 8, p: 4, textAlign: 'center', bgcolor: 'white', borderRadius: 2, boxShadow: 3, border: '1px solid #e0e0e0' }}>
@@ -296,131 +295,440 @@ export default function ExamPage() {
     );
   }
 
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
-  const currentQ = questions[currentQuestion];
+  const handleSelectOption = (questionId: number, answerId: number) => {
+    setAnswers(prev => ({
+      ...prev,
+      [questionId]: answerId
+    }));
+  };
+
+  const question = questions[currentQuestion];
+  const progressPercent = (Object.keys(answers).length / questions.length) * 100;
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
-      {/* Header Panel */}
-      <Card elevation={3} sx={{ mb: 3, backgroundColor: 'rgb(22, 119, 185)', color: 'white' }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box>
-              <Typography variant="h5" fontWeight={700} sx={{ fontFamily: "'Palatino Linotype', Palatino, serif" }}>
-                {exam?.title}
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-                Câu hỏi {currentQuestion + 1} / {questions.length}
-              </Typography>
-            </Box>
-            <Box sx={{ textAlign: 'right', bgcolor: 'rgba(255,255,255,0.15)', px: 3, py: 1.5, borderRadius: 2 }}>
-              <Typography variant="h4" fontWeight={700} sx={{ fontFamily: 'monospace' }}>
-                {formatTime(timeLeft)}
-              </Typography>
-              <Typography variant="caption" sx={{ mt: 0.5 }}>Thời gian còn lại</Typography>
-            </Box>
-          </Box>
-        </CardContent>
-      </Card>
-
-      {/* Question sheet container */}
-      <Paper elevation={2} sx={{ p: 4, minHeight: '55vh', display: 'flex', flexDirection: 'column' }}>
-        <Box sx={{ mb: 4 }}>
-          <LinearProgress variant="determinate" value={progress} sx={{ height: 8, borderRadius: 4, mb: 1, '& .MuiLinearProgress-bar': { backgroundColor: 'rgb(22, 119, 185)' } }} />
-        </Box>
-
-        <Box sx={{ mb: 4, p: 3, bgcolor: '#f8f9fa', borderRadius: 2, borderLeft: '4px solid rgb(22, 119, 185)' }}>
-          <Typography variant="h6" fontWeight={600} sx={{ fontFamily: "'Palatino Linotype', Palatino, serif" }}>
-            {currentQ.content}
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f8fafc', py: 4, px: { xs: 2, md: 4 } }}>
+      {/* Header of the Exam */}
+      <Paper 
+        elevation={0}
+        sx={{
+          p: 3,
+          mb: 4,
+          borderRadius: 4,
+          border: '1px solid rgba(226, 232, 240, 0.8)',
+          background: 'white',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2,
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)'
+        }}
+      >
+        <Box>
+          <Typography variant="h5" fontWeight={700} sx={{ color: '#0f172a', fontFamily: "'Palatino Linotype', Palatino, serif" }}>
+            {exam?.title}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Thí sinh: <strong>{user?.username || 'Student'}</strong> | Email: <strong>{user?.email || 'N/A'}</strong>
           </Typography>
         </Box>
-
-        <RadioGroup
-          value={answers[currentQ.id]?.toString() || ''}
-          onChange={(e) => setAnswers({ ...answers, [currentQ.id]: Number(e.target.value) })}
-          sx={{ flexGrow: 1 }}
+        <Button
+          variant="contained"
+          color="error"
+          onClick={() => handleSubmit(false)}
+          startIcon={<Send />}
+          sx={{
+            px: 4,
+            py: 1.2,
+            borderRadius: 3,
+            textTransform: 'none',
+            fontWeight: 600,
+            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)',
+            background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
+            '&:hover': {
+              background: 'linear-gradient(90deg, #dc2626 0%, #b91c1c 100%)',
+            }
+          }}
         >
-          {currentQ.answers.map((ans) => (
-            <Paper
-              key={ans.id}
-              variant="outlined"
-              sx={{
-                mb: 2, p: 1.5, cursor: 'pointer', transition: 'all 0.2s',
-                '&:hover': { bgcolor: '#f0f7fb', borderColor: 'rgb(22, 119, 185)' },
-                bgcolor: answers[currentQ.id] === ans.id ? '#e3f2fd' : 'transparent',
-                borderColor: answers[currentQ.id] === ans.id ? 'rgb(22, 119, 185)' : '#e0e0e0',
-              }}
-              onClick={() => setAnswers({ ...answers, [currentQ.id]: ans.id })}
-            >
-              <FormControlLabel
-                value={ans.id.toString()}
-                control={<Radio sx={{ color: 'rgb(22, 119, 185)', '&.Mui-checked': { color: 'rgb(22, 119, 185)' } }} />}
-                label={<Typography sx={{ fontWeight: 500 }}>{ans.content}</Typography>}
-                sx={{ width: '100%', m: 0 }}
-              />
-            </Paper>
-          ))}
-        </RadioGroup>
-
-        {/* Navigation buttons */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-          <Button
-            variant="outlined"
-            startIcon={<NavigateBefore />}
-            disabled={currentQuestion === 0}
-            onClick={() => setCurrentQuestion(currentQuestion - 1)}
-            sx={{ color: 'rgb(22, 119, 185)', borderColor: 'rgb(22, 119, 185)', '&:hover': { borderColor: 'rgb(18, 95, 148)', bgcolor: 'rgba(22, 119, 185, 0.04)' } }}
-          >
-            Câu trước
-          </Button>
-
-          {currentQuestion === questions.length - 1 ? (
-            <Button
-              variant="contained"
-              endIcon={<Send />}
-              onClick={() => handleSubmit(false)}
-              disabled={isSubmitting}
-              sx={{ backgroundColor: 'rgb(22, 119, 185)', '&:hover': { backgroundColor: 'rgb(18, 95, 148)' } }}
-            >
-              {isSubmitting ? 'Đang chấm...' : 'Nộp Bài'}
-            </Button>
-          ) : (
-            <Button
-              variant="contained"
-              endIcon={<NavigateNext />}
-              onClick={() => setCurrentQuestion(currentQuestion + 1)}
-              sx={{ backgroundColor: 'rgb(22, 119, 185)', '&:hover': { backgroundColor: 'rgb(18, 95, 148)' } }}
-            >
-              Câu tiếp
-            </Button>
-          )}
-        </Box>
+          Nộp bài thi
+        </Button>
       </Paper>
 
-      {/* Cheating Violation warning Dialog */}
+      <Grid container spacing={4}>
+        {/* Left Sidebar (Timer, Progress, Navigator) */}
+        <Grid item xs={12} md={4} lg={3}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, position: 'sticky', top: 24 }}>
+            {/* Timer card */}
+            <Card
+              elevation={0}
+              sx={{
+                borderRadius: 4,
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                background: 'white',
+                textAlign: 'center',
+                p: 2
+              }}
+            >
+              <CardContent sx={{ p: '16px !important' }}>
+                <Typography variant="body2" color="text.secondary" fontWeight={600} gutterBottom>
+                  THỜI GIAN CÒN LẠI
+                </Typography>
+                <Typography
+                  variant="h3"
+                  fontWeight={800}
+                  sx={{
+                    fontFamily: 'monospace',
+                    letterSpacing: '2px',
+                    my: 1.5,
+                    display: 'inline-block',
+                    transition: 'all 0.3s ease',
+                    ...(timeLeft < 180 ? {
+                      color: '#ef4444',
+                      animation: 'pulse 1s infinite alternate',
+                      '@keyframes pulse': {
+                        '0%': { transform: 'scale(1)', textShadow: '0 0 4px rgba(239, 68, 68, 0.2)' },
+                        '100%': { transform: 'scale(1.08)', textShadow: '0 0 12px rgba(239, 68, 68, 0.6)' }
+                      }
+                    } : {
+                      color: '#1e293b'
+                    })
+                  }}
+                >
+                  {formatTime(timeLeft)}
+                </Typography>
+                {timeLeft < 180 && (
+                  <Typography variant="caption" color="error" fontWeight={600} sx={{ display: 'block', mt: 0.5 }}>
+                    ⚠️ Sắp hết giờ! Nhanh chóng hoàn thành bài thi.
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Progress Card */}
+            <Card
+              elevation={0}
+              sx={{
+                borderRadius: 4,
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                background: 'white',
+                p: 2
+              }}
+            >
+              <CardContent sx={{ p: '16px !important' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                    TIẾN ĐỘ LÀM BÀI
+                  </Typography>
+                  <Typography variant="body2" fontWeight={700} color="primary">
+                    {Object.keys(answers).length}/{questions.length} câu
+                  </Typography>
+                </Box>
+                <LinearProgress 
+                  variant="determinate" 
+                  value={progressPercent} 
+                  sx={{ 
+                    height: 8, 
+                    borderRadius: 4,
+                    bgcolor: '#f1f5f9',
+                    '& .MuiLinearProgress-bar': {
+                      borderRadius: 4,
+                      background: 'linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%)'
+                    }
+                  }}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Question Navigator Card */}
+            <Card
+              elevation={0}
+              sx={{
+                borderRadius: 4,
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                background: 'white',
+                p: 2
+              }}
+            >
+              <CardContent sx={{ p: '16px !important' }}>
+                <Typography variant="body2" color="text.secondary" fontWeight={600} sx={{ mb: 2 }}>
+                  BẢNG ĐIỀU HƯỚNG
+                </Typography>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(5, 1fr)',
+                    gap: 1.2,
+                    maxHeight: 280,
+                    overflowY: 'auto',
+                    pr: 0.5,
+                    '&::-webkit-scrollbar': {
+                      width: 6,
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      background: '#f8fafc',
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      background: '#cbd5e1',
+                      borderRadius: 3,
+                    }
+                  }}
+                >
+                  {questions.map((q, idx) => {
+                    const isAnswered = answers[q.id] !== undefined;
+                    const isActive = idx === currentQuestion;
+
+                    let btnBg = 'white';
+                    let btnColor = '#475569';
+                    let btnBorder = '1px solid #cbd5e1';
+
+                    if (isActive) {
+                      btnBg = '#4f46e5';
+                      btnColor = 'white';
+                      btnBorder = '1px solid #4f46e5';
+                    } else if (isAnswered) {
+                      btnBg = 'rgba(79, 70, 229, 0.1)';
+                      btnColor = '#4f46e5';
+                      btnBorder = '1px solid rgba(79, 70, 229, 0.3)';
+                    }
+
+                    return (
+                      <Button
+                        key={q.id}
+                        onClick={() => setCurrentQuestion(idx)}
+                        sx={{
+                          aspectRatio: '1/1',
+                          minWidth: 0,
+                          p: 0,
+                          borderRadius: 2.5,
+                          fontSize: '0.95rem',
+                          fontWeight: 700,
+                          bgcolor: btnBg,
+                          color: btnColor,
+                          border: btnBorder,
+                          transition: 'all 0.2s',
+                          '&:hover': {
+                            bgcolor: isActive ? '#4338ca' : 'rgba(79, 70, 229, 0.05)',
+                            borderColor: '#4f46e5',
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                      >
+                        {idx + 1}
+                      </Button>
+                    );
+                  })}
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        </Grid>
+
+        {/* Right main workspace (question prompt, multiple-choice options) */}
+        <Grid item xs={12} md={8} lg={9}>
+          <Card
+            elevation={0}
+            sx={{
+              borderRadius: 4,
+              border: '1px solid rgba(226, 232, 240, 0.8)',
+              background: 'white',
+              p: { xs: 3, md: 4 },
+              minHeight: '60vh',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}
+          >
+            <Box>
+              {/* Question header */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Câu hỏi {currentQuestion + 1} / {questions.length}
+                </Typography>
+                {answers[question.id] !== undefined && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#10b981', bgcolor: 'rgba(16, 185, 129, 0.1)', px: 1.5, py: 0.5, borderRadius: 2 }}>
+                    <CheckCircleOutline sx={{ fontSize: 16 }} />
+                    <Typography variant="caption" fontWeight={600}>Đã lưu</Typography>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Question prompt content */}
+              <Typography 
+                variant="h6" 
+                fontWeight={600} 
+                sx={{ 
+                  color: '#0f172a', 
+                  mb: 4, 
+                  lineHeight: 1.6,
+                  fontSize: '1.2rem',
+                  fontFamily: "'Inter', sans-serif"
+                }}
+              >
+                {question.content}
+              </Typography>
+
+              {/* Multiple-choice options list */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {question.answers.map((answer, index) => {
+                  const labelLetter = String.fromCharCode(65 + index); // A, B, C, D
+                  const isSelected = answers[question.id] === answer.id;
+
+                  return (
+                    <Box
+                      key={answer.id}
+                      onClick={() => handleSelectOption(question.id, answer.id)}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        p: 2,
+                        borderRadius: 3,
+                        border: isSelected ? '2px solid #4f46e5' : '1px solid #cbd5e1',
+                        bgcolor: isSelected ? 'rgba(79, 70, 229, 0.02)' : 'white',
+                        cursor: 'pointer',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px rgba(79, 70, 229, 0.08)',
+                          borderColor: isSelected ? '#4f46e5' : '#4f46e5'
+                        },
+                        ...(isSelected && {
+                          transform: 'scale(1.015)',
+                          boxShadow: '0 6px 16px rgba(79, 70, 229, 0.12)'
+                        })
+                      }}
+                    >
+                      {/* Letter badge */}
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: '50%',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          fontWeight: 700,
+                          fontSize: '1.05rem',
+                          mr: 2,
+                          transition: 'all 0.2s',
+                          bgcolor: isSelected ? '#4f46e5' : '#f1f5f9',
+                          color: isSelected ? 'white' : '#475569',
+                          border: isSelected ? '1px solid #4f46e5' : '1px solid #cbd5e1'
+                        }}
+                      >
+                        {labelLetter}
+                      </Box>
+                      <Typography 
+                        variant="body1" 
+                        sx={{ 
+                          fontWeight: isSelected ? 600 : 500,
+                          color: isSelected ? '#1e293b' : '#334155',
+                          fontSize: '1.05rem'
+                        }}
+                      >
+                        {answer.content}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Box>
+
+            {/* Navigation buttons at the bottom of the workspace */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 6, pt: 3, borderTop: '1px solid #e2e8f0' }}>
+              <Button
+                variant="outlined"
+                startIcon={<NavigateBefore />}
+                disabled={currentQuestion === 0}
+                onClick={() => setCurrentQuestion(prev => prev - 1)}
+                sx={{
+                  borderRadius: 3,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 3,
+                  py: 1,
+                  borderWidth: 1.5,
+                  '&:hover': { borderWidth: 1.5 }
+                }}
+              >
+                Câu trước
+              </Button>
+
+              <Button
+                variant="outlined"
+                endIcon={<NavigateNext />}
+                disabled={currentQuestion === questions.length - 1}
+                onClick={() => setCurrentQuestion(prev => prev + 1)}
+                sx={{
+                  borderRadius: 3,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 3,
+                  py: 1,
+                  borderWidth: 1.5,
+                  '&:hover': { borderWidth: 1.5 }
+                }}
+              >
+                Câu sau
+              </Button>
+            </Box>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Warning Dialog (anti-cheat) */}
       <Dialog 
         open={warningOpen} 
         onClose={() => setWarningOpen(false)}
         PaperProps={{
-          sx: { borderRadius: 3, p: 2, maxWidth: 450 }
+          sx: { borderRadius: 4, p: 1, maxWidth: 450 }
         }}
       >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main', fontWeight: 700 }}>
-          <Warning sx={{ fontSize: 32 }} /> Cảnh báo Vi phạm
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: '#ef4444', fontWeight: 700 }}>
+          <Warning sx={{ fontSize: 28 }} />
+          Cảnh Báo Chống Gian Lận!
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ color: '#334155', lineHeight: 1.6 }}>
             {warningMessage}
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
+        <DialogActions sx={{ p: 2.5 }}>
           <Button 
             variant="contained" 
-            color="error"
+            color="error" 
             onClick={() => setWarningOpen(false)}
-            sx={{ px: 4, py: 1, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+            sx={{ borderRadius: 3, px: 3, py: 1, textTransform: 'none', fontWeight: 600 }}
           >
             Tôi đã hiểu và cam kết không vi phạm
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Interaction Block Warning Dialog (right click, copy, paste) */}
+      <Dialog 
+        open={interactionWarningOpen} 
+        onClose={() => setInteractionWarningOpen(false)}
+        PaperProps={{
+          sx: { borderRadius: 4, p: 1, maxWidth: 450 }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: '#f59e0b', fontWeight: 700 }}>
+          <Warning sx={{ fontSize: 28 }} />
+          Thao Tác Không Hợp Lệ!
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ color: '#334155', lineHeight: 1.6 }}>
+            {interactionWarningMessage}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5 }}>
+          <Button 
+            variant="contained" 
+            color="warning" 
+            onClick={() => setInteractionWarningOpen(false)}
+            sx={{ borderRadius: 3, px: 3, py: 1, textTransform: 'none', fontWeight: 600, color: 'white' }}
+          >
+            Đóng
           </Button>
         </DialogActions>
       </Dialog>
@@ -430,71 +738,49 @@ export default function ExamPage() {
         open={submitDialogOpen} 
         onClose={() => setSubmitDialogOpen(false)}
         PaperProps={{
-          sx: { borderRadius: 3, p: 2, maxWidth: 400 }
+          sx: { borderRadius: 4, p: 1, maxWidth: 450 }
         }}
       >
-        <DialogTitle sx={{ fontWeight: 700, color: '#0f172a' }}>
-          Xác nhận Nộp bài
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: '#4f46e5', fontWeight: 700 }}>
+          <Send sx={{ fontSize: 24 }} />
+          Xác Nhận Nộp Bài Thi
         </DialogTitle>
         <DialogContent>
-          <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.5 }}>
-            Bạn có chắc chắn muốn nộp bài thi này không? Hãy chắc chắn bạn đã rà soát kỹ tất cả các câu trả lời.
+          <Typography variant="body1" sx={{ color: '#334155', mb: 2 }}>
+            Bạn có chắc chắn muốn nộp bài thi không?
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Số câu đã trả lời: <strong>{Object.keys(answers).length} / {questions.length}</strong>
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+        <DialogActions sx={{ p: 2.5, gap: 1.5 }}>
           <Button 
             variant="outlined" 
             onClick={() => setSubmitDialogOpen(false)}
-            sx={{ flex: 1, py: 1, borderRadius: 2, textTransform: 'none', fontWeight: 600, color: '#64748b', borderColor: '#e2e8f0' }}
+            sx={{ borderRadius: 3, px: 3, py: 1, textTransform: 'none', fontWeight: 600 }}
           >
-            Làm tiếp
+            Hủy
           </Button>
           <Button 
             variant="contained" 
+            color="primary" 
             onClick={() => {
               setSubmitDialogOpen(false);
-              void handleSubmit(true);
+              handleSubmit(true);
             }}
             sx={{ 
-              flex: 1, 
+              borderRadius: 3, 
+              px: 3, 
               py: 1, 
-              borderRadius: 2, 
               textTransform: 'none', 
               fontWeight: 600,
               background: 'linear-gradient(90deg, #4f46e5 0%, #6366f1 100%)',
               '&:hover': {
-                background: 'linear-gradient(90deg, #4338ca 0%, #4f46e5 100%)',
+                background: 'linear-gradient(90deg, #4338ca 0%, #4f46e5 100%)'
               }
             }}
           >
-            Nộp bài
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Custom Copy/Paste/Context Warning Dialog */}
-      <Dialog 
-        open={interactionWarningOpen} 
-        onClose={() => setInteractionWarningOpen(false)}
-        PaperProps={{
-          sx: { borderRadius: 3, p: 2, maxWidth: 400 }
-        }}
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'warning.main', fontWeight: 700 }}>
-          <Warning sx={{ fontSize: 28 }} /> Hành động bị hạn chế
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.5 }}>
-            {interactionWarningMessage}
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
-          <Button 
-            variant="contained" 
-            onClick={() => setInteractionWarningOpen(false)}
-            sx={{ px: 4, py: 1, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
-          >
-            Đồng ý
+            Xác nhận nộp bài
           </Button>
         </DialogActions>
       </Dialog>
