@@ -105,36 +105,48 @@ export default function TeacherDashboard() {
   }
 
   return (
-    <Box>
-      <Typography variant="h4" fontWeight={600} gutterBottom>
+    <Box sx={{ pb: 6 }}>
+      <Typography variant="h4" fontWeight={700} gutterBottom sx={{ letterSpacing: '-0.5px', color: '#0f172a' }}>
         Teacher Dashboard
       </Typography>
 
-      <Grid container spacing={3} sx={{ mt: 2 }}>
+      <Grid container spacing={3} sx={{ mt: 1 }}>
         {stats.map((stat) => (
           <Grid size={{ xs: 12, md: 4 }} key={stat.title}>
-            <Card elevation={2}>
-              <CardContent>
+            <Card 
+              elevation={0}
+              sx={{
+                borderRadius: 3,
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                background: 'white',
+                transition: 'all 0.3s ease-in-out',
+                '&:hover': { 
+                  transform: 'translateY(-4px)', 
+                  boxShadow: '0 12px 20px rgba(0,0,0,0.05)',
+                }
+              }}
+            >
+              <CardContent sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Box
                     sx={{
-                      width: 60,
-                      height: 60,
+                      width: 54,
+                      height: 54,
                       borderRadius: 2,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      background: `linear-gradient(135deg, ${stat.color}, ${stat.color}99)`,
+                      background: `linear-gradient(135deg, ${stat.color} 0%, ${stat.color}bb 100%)`,
                       color: 'white',
                     }}
                   >
                     {stat.icon}
                   </Box>
                   <Box>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
                       {stat.title}
                     </Typography>
-                    <Typography variant="h4" fontWeight={600}>
+                    <Typography variant="h4" fontWeight={700} sx={{ color: '#0f172a', mt: 0.5 }}>
                       {stat.value}
                     </Typography>
                   </Box>
@@ -145,43 +157,55 @@ export default function TeacherDashboard() {
         ))}
       </Grid>
 
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="h5" fontWeight={600} gutterBottom>
+      <Box sx={{ mt: 5 }}>
+        <Typography variant="h5" fontWeight={700} gutterBottom sx={{ color: '#0f172a' }}>
           My Exams
         </Typography>
-        <TableContainer component={Paper} elevation={2} sx={{ mt: 2 }}>
+        <TableContainer 
+          component={Paper} 
+          elevation={0} 
+          sx={{ 
+            mt: 2, 
+            borderRadius: 3, 
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            overflow: 'hidden'
+          }}
+        >
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell fontWeight={600}>Exam Title</TableCell>
-                <TableCell fontWeight={600}>Exam Code</TableCell>
-                <TableCell fontWeight={600}>Questions</TableCell>
-                <TableCell fontWeight={600}>Students</TableCell>
-                <TableCell fontWeight={600}>Status</TableCell>
-                <TableCell fontWeight={600} align="right">Actions</TableCell>
+              <TableRow sx={{ backgroundColor: '#f8fafc' }}>
+                <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Exam Title</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Exam Code</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Questions</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Students</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569' }} align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {myExams.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    No exams found
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No exams found
+                    </Typography>
                   </TableCell>
                 </TableRow>
               )}
               {myExams.map((exam) => (
-                <TableRow key={exam.id} hover>
-                  <TableCell>{exam.title}</TableCell>
+                <TableRow key={exam.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                  <TableCell sx={{ fontWeight: 500, color: '#0f172a' }}>{exam.title}</TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Chip
                         label={exam.code}
                         sx={{
-                          bgcolor: '#f5f5ff',
-                          color: '#667eea',
+                          bgcolor: 'rgba(79, 70, 229, 0.08)',
+                          color: '#4f46e5',
                           fontWeight: 700,
                           fontFamily: 'monospace',
-                          letterSpacing: 1,
+                          letterSpacing: 0.5,
+                          borderRadius: 1.5,
                         }}
                         size="small"
                       />
@@ -189,19 +213,21 @@ export default function TeacherDashboard() {
                         <IconButton
                           size="small"
                           onClick={() => handleCopyCode(exam.code)}
+                          sx={{ color: '#64748b' }}
                         >
                           <ContentCopy fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     </Box>
                   </TableCell>
-                  <TableCell>{exam.questions}</TableCell>
-                  <TableCell>{exam.students}</TableCell>
+                  <TableCell sx={{ color: '#334155' }}>{exam.questions}</TableCell>
+                  <TableCell sx={{ color: '#334155' }}>{exam.students}</TableCell>
                   <TableCell>
                     <Chip
                       label={exam.status}
                       color={exam.status === 'active' ? 'success' : 'warning'}
                       size="small"
+                      sx={{ fontWeight: 600, borderRadius: 1.5, textTransform: 'capitalize' }}
                     />
                   </TableCell>
                   <TableCell align="right">
@@ -210,11 +236,11 @@ export default function TeacherDashboard() {
                         color="primary"
                         size="small"
                         onClick={() => navigate(`/teacher/exam/${exam.id}`)}
+                        sx={{ mr: 1 }}
                       >
                         <Visibility />
                       </IconButton>
                     </Tooltip>
-                    {/* Edit removed here - go to details page to edit */}
                     <Tooltip title="Delete">
                       <IconButton color="error" size="small" onClick={() => void handleDeleteExam(exam.id)}>
                         <Delete />
