@@ -236,6 +236,15 @@ export class TeacherService {
             throw new BadRequestException('Không tìm thấy đề thi hoặc bạn không có quyền xóa');
         }
 
+        const { error: resultError } = await this.supabase
+            .from('results') // đổi tên bảng nếu bảng của bạn không phải results
+            .delete()
+            .eq('exam_id', id);
+
+        if (resultError) {
+            throw new BadRequestException(resultError.message);
+        }
+
         const { error: examQuestionError } = await this.supabase
             .from('exam_questions')
             .delete()

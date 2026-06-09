@@ -1,7 +1,0 @@
-packages:
-  - '.'
-  - 'backend'
-allowBuilds:
-  '@nestjs/core': true
-  '@tailwindcss/oxide': true
-  esbuild: true

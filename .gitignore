@@ -15,3 +15,6 @@ build/
 
 # logs
 *.log
+
+# pnpm store
+.pnpm-store/
