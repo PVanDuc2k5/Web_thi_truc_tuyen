@@ -236,6 +236,41 @@ export class TeacherService {
             throw new BadRequestException('Không tìm thấy đề thi hoặc bạn không có quyền xóa');
         }
 
+        // 1. Lấy tất cả result_id liên quan đến exam_id để xóa user_answers
+        const { data: results, error: getResultsError } = await this.supabase
+            .from('results')
+            .select('id')
+            .eq('exam_id', id);
+
+        if (getResultsError) {
+            throw new BadRequestException(getResultsError.message);
+        }
+
+        const resultIds = results?.map((r) => r.id) || [];
+
+        // 2. Xóa các câu trả lời của học sinh (user_answers) trước
+        if (resultIds.length > 0) {
+            const { error: deleteUserAnswersError } = await this.supabase
+                .from('user_answers')
+                .delete()
+                .in('result_id', resultIds);
+
+            if (deleteUserAnswersError) {
+                throw new BadRequestException(deleteUserAnswersError.message);
+            }
+        }
+
+        // 3. Xóa các kết quả thi (results)
+        const { error: resultError } = await this.supabase
+            .from('results')
+            .delete()
+            .eq('exam_id', id);
+
+        if (resultError) {
+            throw new BadRequestException(resultError.message);
+        }
+
+        // 4. Xóa quan hệ câu hỏi - đề thi (exam_questions)
         const { error: examQuestionError } = await this.supabase
             .from('exam_questions')
             .delete()
@@ -245,6 +280,7 @@ export class TeacherService {
             throw new BadRequestException(examQuestionError.message);
         }
 
+        // 5. Xóa chính đề thi (exams)
         const { error: examError } = await this.supabase
             .from('exams')
             .delete()
@@ -634,55 +670,5 @@ export class TeacherService {
   
 
 
-  async deleteExam(body: any, userId: string) {
-        const teacher_id = userId;
-        const { id } = body;
- 
-        if (!id) {
-            throw new BadRequestException('Thiếu exam id');
-        }
- 
-        const { data: exam, error: findError } = await this.supabase
-            .from('exams')
-            .select('*')
-            .eq('id', id)
-            .eq('teacher_id', teacher_id)
-            .single();
- 
-        if (findError || !exam) {
-            throw new BadRequestException('Không tìm thấy đề thi hoặc bạn không có quyền xóa');
-        }
- 
-        const { error: resultError } = await this.supabase
-            .from('results')
-            .delete()
-            .eq('exam_id', id);
- 
-        if (resultError) {
-            throw new BadRequestException(resultError.message);
-        }
- 
-        const { error: examQuestionError } = await this.supabase
-            .from('exam_questions')
-            .delete()
-            .eq('exam_id', id);
- 
-        if (examQuestionError) {
-            throw new BadRequestException(examQuestionError.message);
-        }
- 
-        const { error: examError } = await this.supabase
-            .from('exams')
-            .delete()
-            .eq('id', id)
-            .eq('teacher_id', teacher_id);
- 
-        if (examError) {
-            throw new BadRequestException(examError.message);
-        }
- 
-        return {
-            message: 'Xóa đề thi thành công',
-        };
-    }
+
 }
