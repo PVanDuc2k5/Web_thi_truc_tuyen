@@ -4,7 +4,7 @@ import { useAuthStore } from '../../lib/auth-store';
 import apiClient from '../../lib/api-client';
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setLoading } = useAuthStore();
+  const { login, setLoading } = useAuthStore();
 
   useEffect(() => {
     const initAuth = async () => {
@@ -13,10 +13,14 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
       if (session?.user) {
         try {
-          // Fetch user profile from NestJS backend
-          const { data } = await apiClient.get('/auth/me');
+          // Fetch user profile from NestJS backend using explicit authorization token
+          const { data } = await apiClient.get('/auth/me', {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
           
-          setUser({
+          login(session.access_token, {
             id: session.user.id,
             email: session.user.email!,
             role: data.profile.role,
@@ -27,8 +31,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           // If /auth/me fails, clear state
           useAuthStore.getState().logout();
         }
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initAuth();
@@ -38,14 +43,16 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
          // Will be handled by the initAuth logic or login flow
       } else if (event === 'SIGNED_OUT') {
-        useAuthStore.getState().logout();
+        if (useAuthStore.getState().isAuthenticated) {
+          useAuthStore.getState().logout();
+        }
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [setUser, setLoading]);
+  }, [login, setLoading]);
 
   return <>{children}</>;
 }

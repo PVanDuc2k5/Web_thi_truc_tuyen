@@ -20,12 +20,12 @@ interface AuthState {
   setUser: (user: User) => void;
   setLoading: (loading: boolean) => void;
   login: (token: string, user: User) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       role: null,
       token: null,
@@ -41,14 +41,22 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
           isLoading: false,
         }),
-      logout: () =>
+      logout: async () => {
+        if (get().isAuthenticated) {
+          try {
+            await supabase.auth.signOut();
+          } catch (err) {
+            console.error('SignOut error:', err);
+          }
+        }
         set({
           user: null,
           role: null,
           token: null,
           isAuthenticated: false,
           isLoading: false,
-        }),
+        });
+      },
     }),
     {
       name: 'auth-storage',
