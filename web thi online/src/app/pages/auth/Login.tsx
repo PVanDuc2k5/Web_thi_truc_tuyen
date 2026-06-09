@@ -5,6 +5,7 @@ import { useAuthStore } from '../../../lib/auth-store';
 import apiClient from '../../../lib/api-client';
 import { TextField, Button, Box, Typography, Card, CardContent, Container, Grow } from '@mui/material';
 import { School } from '@mui/icons-material';
+import { toast } from 'sonner';
 
 
 export default function Login() {
@@ -12,10 +13,12 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
@@ -24,6 +27,7 @@ export default function Login() {
 
     if (signInError) {
       setError(signInError.message);
+      setLoading(false);
       return;
     }
 
@@ -40,13 +44,18 @@ export default function Login() {
           username: profile.username,
         });
 
-        if (profile.role === 'teacher') {
-          navigate('/teacher');
-        } else {
-          navigate('/student');
-        }
+        toast.success(`Welcome back, ${profile.username || user.email}! Redirecting...`);
+
+        setTimeout(() => {
+          if (profile.role === 'teacher') {
+            navigate('/teacher');
+          } else {
+            navigate('/student');
+          }
+        }, 1200);
       } catch (err) {
         setError('Failed to fetch user profile.');
+        setLoading(false);
         console.error(err);
       }
     }
@@ -74,9 +83,11 @@ export default function Login() {
               </Box>
               <form onSubmit={handleLogin}>
                 {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
-                <TextField fullWidth label="Email" type="email" variant="outlined" margin="normal" value={email} onChange={(e) => setEmail(e.target.value)} required />
-                <TextField fullWidth label="Password" type="password" variant="outlined" margin="normal" value={password} onChange={(e) => setPassword(e.target.value)} required />
-                <Button type="submit" fullWidth variant="contained" size="large" sx={{ mt: 3, mb: 2, py: 1.5, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>Sign In</Button>
+                <TextField fullWidth label="Email" type="email" variant="outlined" margin="normal" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={loading} />
+                <TextField fullWidth label="Password" type="password" variant="outlined" margin="normal" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={loading} />
+                <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 3, mb: 2, py: 1.5, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+                  {loading ? 'Signing In...' : 'Sign In'}
+                </Button>
                 <Box sx={{ textAlign: 'center', mt: 2 }}>
                   <Typography variant="body2" color="text.secondary">Don't have an account?{' '}<Button onClick={() => navigate('/register')} sx={{ textTransform: 'none' }}>Register</Button></Typography>
                 </Box>
