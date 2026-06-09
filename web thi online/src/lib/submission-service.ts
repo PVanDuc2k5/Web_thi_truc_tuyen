@@ -117,7 +117,7 @@ export const getExamResults = async (examId: number) => {
             .from('results')
             .select(`
         *,
-        users (*)
+        user_profiles (*)
       `)
             .eq('exam_id', examId)
             .order('submitted_at', { ascending: false });

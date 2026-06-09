@@ -19,6 +19,7 @@ interface Exam { id: number; title: string; duration: number; }
 export default function ExamPage() {
   const navigate = useNavigate();
   const { examId } = useParams();
+  const { user } = useAuthStore();
   
   // Đảm bảo luôn có ID để làm key lưu LocalStorage
   const safeExamId = examId || "1";
@@ -50,7 +51,7 @@ export default function ExamPage() {
       try {
         // --- BẮT ĐẦU ĐOẠN KIỂM TRA BẢO MẬT ---
         const user = useAuthStore.getState().user;
-        
+
         if (user) {
           // Check xem trong DB có điểm của người này cho đề này chưa
           const { data: existingResult, error: checkError } = await supabase
@@ -63,7 +64,7 @@ export default function ExamPage() {
           // Nếu tìm thấy điểm (nghĩa là đã thi rồi)
           if (existingResult) {
             alert('Bạn đã hoàn thành bài thi này rồi! Hệ thống không cho phép thi lại.');
-            navigate('/student/dashboard'); // Đá văng về trang chủ
+            navigate('/student'); // Đá văng về trang chủ
             return; // Dừng lập tức, không chạy phần code lấy đề bên dưới nữa
           }
         }
@@ -193,12 +194,13 @@ export default function ExamPage() {
         <Typography variant="h1" fontWeight={900} sx={{ color: 'rgb(22, 119, 185)', mt: 1, mb: 4 }}>
           {result.score}
         </Typography>
-        <Button 
-          variant="contained" 
-          onClick={() => navigate('/student')} 
-          sx={{ backgroundColor: 'rgb(22, 119, 185)', '&:hover': { backgroundColor: 'rgb(18, 95, 148)' }, px: 4, py: 1.5, fontSize: '1.1rem', borderRadius: 2 }}
+        <Button
+          variant="contained"
+          size="large"
+          onClick={() => navigate('/student')}
+          sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', px: 4, py: 1.5, fontSize: '1.1rem', borderRadius: 2 }}
         >
-          Quay lại trang chủ
+          Quay lại Trang chủ
         </Button>
       </Box>
     );

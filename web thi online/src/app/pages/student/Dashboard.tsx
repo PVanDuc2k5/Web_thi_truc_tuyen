@@ -37,6 +37,7 @@ interface Exam {
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   
   const [examCode, setExamCode] = useState('');
   const [joinError, setJoinError] = useState('');
