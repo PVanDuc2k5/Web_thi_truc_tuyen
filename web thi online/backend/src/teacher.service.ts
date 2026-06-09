@@ -631,4 +631,58 @@ export class TeacherService {
             questionList: questions,
         };
     }
+  
+
+
+  async deleteExam(body: any, userId: string) {
+        const teacher_id = userId;
+        const { id } = body;
+ 
+        if (!id) {
+            throw new BadRequestException('Thiếu exam id');
+        }
+ 
+        const { data: exam, error: findError } = await this.supabase
+            .from('exams')
+            .select('*')
+            .eq('id', id)
+            .eq('teacher_id', teacher_id)
+            .single();
+ 
+        if (findError || !exam) {
+            throw new BadRequestException('Không tìm thấy đề thi hoặc bạn không có quyền xóa');
+        }
+ 
+        const { error: resultError } = await this.supabase
+            .from('results')
+            .delete()
+            .eq('exam_id', id);
+ 
+        if (resultError) {
+            throw new BadRequestException(resultError.message);
+        }
+ 
+        const { error: examQuestionError } = await this.supabase
+            .from('exam_questions')
+            .delete()
+            .eq('exam_id', id);
+ 
+        if (examQuestionError) {
+            throw new BadRequestException(examQuestionError.message);
+        }
+ 
+        const { error: examError } = await this.supabase
+            .from('exams')
+            .delete()
+            .eq('id', id)
+            .eq('teacher_id', teacher_id);
+ 
+        if (examError) {
+            throw new BadRequestException(examError.message);
+        }
+ 
+        return {
+            message: 'Xóa đề thi thành công',
+        };
+    }
 }
