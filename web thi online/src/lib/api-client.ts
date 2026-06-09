@@ -20,10 +20,12 @@ apiClient.interceptors.request.use((config) => {
 // Response interceptor: handle 401
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
-      window.location.href = '/'; // Redirect to login
+      await useAuthStore.getState().logout();
+      if (window.location.pathname !== '/') {
+        window.location.href = '/'; // Redirect to login
+      }
     }
     return Promise.reject(error);
   }

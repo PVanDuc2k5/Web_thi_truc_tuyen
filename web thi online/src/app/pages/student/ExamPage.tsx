@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useAuthStore } from '../../../lib/auth-store';
+import apiClient from '../../../lib/api-client';
 import {
   Box, Typography, Paper, RadioGroup, FormControlLabel, Radio,
   Button, LinearProgress, Card, CardContent, CircularProgress
@@ -34,14 +35,11 @@ export default function ExamPage() {
   useEffect(() => {
     const fetchExamData = async () => {
       try {
-        const id = examId || "1"; // Ưu tiên URL, nếu không có thì test tạm bài 1
-        const response = await fetch(`http://localhost:3001/student/exam/${id}`);
-        if (!response.ok) throw new Error('Không tìm thấy đề thi (DB trống)');
-        
-        const data = await response.json();
+        const id = examId || "1";
+        const { data } = await apiClient.get(`/student/exam/${id}`);
         setExam(data.exam);
         setQuestions(data.questions);
-        setTimeLeft(data.exam.duration * 60); // Đổi phút ra giây cho đồng hồ
+        setTimeLeft(data.exam.duration * 60);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -94,19 +92,11 @@ export default function ExamPage() {
       }));
 
       const payload = {
-        userId: user.id, // Truyền ID THẬT của người thi xuống Database
         examId: exam.id,
         answers: answersPayload
       };
 
-      const response = await fetch('http://localhost:3001/student/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) throw new Error('Lỗi chấm điểm');
-      const data = await response.json();
+      const { data } = await apiClient.post('/student/submit', payload);
       setResult(data);
     } catch (error) {
       alert('Có lỗi xảy ra khi nộp bài!');
