@@ -33,6 +33,7 @@ interface Exam {
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   
   // State khởi tạo bằng mảng rỗng, sẽ được lấp đầy khi gọi DB
   const [examList, setExamList] = useState<Exam[]>([]);
@@ -47,11 +48,7 @@ export default function StudentDashboard() {
   useEffect(() => {
     const fetchExamsAndStatus = async () => {
       try {
-        const savedUser = localStorage.getItem('currentUser');
-        if (!savedUser || savedUser === 'undefined') return; 
-        
-        const currentUser = JSON.parse(savedUser);
-        if (!currentUser || !currentUser.id) return;
+        if (!user || !user.id) return;
 
         // 1. Kéo TOÀN BỘ danh sách đề thi từ bảng exams
         const { data: examsData, error: examsError } = await supabase
@@ -95,7 +92,7 @@ export default function StudentDashboard() {
     };
 
     fetchExamsAndStatus();
-  }, []);
+  }, [user]);
 
   // 🔍 TÍNH NĂNG NHẬP MÃ TÌM ĐỀ THI (REAL DATA)
   const handleJoinExam = async () => {
