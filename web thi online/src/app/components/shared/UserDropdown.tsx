@@ -39,26 +39,58 @@ export default function UserDropdown() {
 
   return (
     <>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
-          <Typography variant="body2" fontWeight={600}>{user?.username || user?.email}</Typography>
-          <Typography variant="caption" color="text.secondary">{user?.role}</Typography>
+          <Typography variant="body2" fontWeight={600} sx={{ color: '#0f172a' }}>{user?.username || user?.email}</Typography>
+          <Typography variant="caption" fontWeight={600} sx={{ color: getAvatarColor(), textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: '0.5px' }}>{user?.role}</Typography>
         </Box>
-        <IconButton onClick={handleClick} size="small">
-          <Avatar sx={{ bgcolor: getAvatarColor(), width: 40, height: 40 }}>
+        <IconButton onClick={handleClick} size="small" sx={{ p: 0.25, border: '2px solid rgba(226, 232, 240, 0.8)', transition: 'border-color 0.2s', '&:hover': { borderColor: getAvatarColor() } }}>
+          <Avatar sx={{ bgcolor: getAvatarColor(), width: 38, height: 38, fontWeight: 600, fontSize: '1rem' }}>
             {user?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}
           </Avatar>
         </IconButton>
       </Box>
-      <Menu anchorEl={anchorEl} open={open} onClose={handleClose} onClick={handleClose} transformOrigin={{ horizontal: 'right', vertical: 'top' }} anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }} PaperProps={{ elevation: 3, sx: { mt: 1.5, minWidth: 200 } }}>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        onClick={handleClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            mt: 1.5,
+            minWidth: 200,
+            overflow: 'visible',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(8px)',
+            boxShadow: '0px 8px 24px rgba(149, 157, 165, 0.15)',
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            borderRadius: 2,
+            '& .MuiMenuItem-root': {
+              px: 2,
+              py: 1.2,
+              transition: 'all 0.15s ease-in-out',
+              '&:hover': {
+                backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                color: '#4f46e5',
+                '& .MuiListItemIcon-root': {
+                  color: '#4f46e5',
+                }
+              }
+            }
+          }
+        }}
+      >
         <MenuItem onClick={handleProfile}>
-          <ListItemIcon><Person fontSize="small" /></ListItemIcon>
-          <ListItemText>Profile</ListItemText>
+          <ListItemIcon sx={{ transition: 'color 0.15s ease' }}><Person fontSize="small" /></ListItemIcon>
+          <ListItemText primaryTypographyProps={{ fontWeight: 500, fontSize: '0.9rem' }}>Profile</ListItemText>
         </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleLogout}>
-          <ListItemIcon><Logout fontSize="small" /></ListItemIcon>
-          <ListItemText>Logout</ListItemText>
+        <Divider sx={{ my: 0.5, borderColor: 'rgba(226, 232, 240, 0.8)' }} />
+        <MenuItem onClick={handleLogout} sx={{ '&:hover': { backgroundColor: 'rgba(239, 68, 68, 0.08) !important', color: '#ef4444 !important', '& .MuiListItemIcon-root': { color: '#ef4444 !important' } } }}>
+          <ListItemIcon sx={{ transition: 'color 0.15s ease' }}><Logout fontSize="small" /></ListItemIcon>
+          <ListItemText primaryTypographyProps={{ fontWeight: 500, fontSize: '0.9rem' }}>Logout</ListItemText>
         </MenuItem>
       </Menu>
     </>
