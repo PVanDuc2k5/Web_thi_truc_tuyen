@@ -10,8 +10,10 @@ import {
   Button,
   CircularProgress,
   Alert,
+  Chip,
+  Divider,
 } from '@mui/material';
-import { Home, Replay, AssignmentTurnedIn } from '@mui/icons-material';
+import { Home, Replay, AssignmentTurnedIn, CheckCircle, Cancel } from '@mui/icons-material';
 import { supabase } from '../../../lib/supabase';
 import { useAuthStore } from '../../../lib/auth-store';
 
@@ -25,97 +27,123 @@ export default function ResultPage() {
   const [examTitle, setExamTitle] = useState('Kết quả bài thi');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [userAnswersMap, setUserAnswersMap] = useState<{ [key: number]: number | null }>({});
 
   useEffect(() => {
+    // If state is passed, populate result immediately to avoid blank screen
     if (location.state && (location.state as any).result) {
       const state = location.state as any;
       setResult(state.result);
       setExamTitle(state.examTitle || 'Kết quả bài thi');
-      setLoading(false);
-    } else {
-      const fetchResult = async () => {
-        try {
-          setLoading(true);
-          setError('');
+    }
 
-          if (!user) {
-            setError('Không tìm thấy thông tin đăng nhập. Vui lòng đăng nhập lại.');
-            return;
-          }
+    const fetchResult = async () => {
+      try {
+        setLoading(true);
+        setError('');
 
-          const numericExamId = Number(examId);
-          if (isNaN(numericExamId)) {
-            setError('Mã đề thi không hợp lệ.');
-            return;
-          }
+        if (!user) {
+          setError('Không tìm thấy thông tin đăng nhập. Vui lòng đăng nhập lại.');
+          return;
+        }
 
-          // 1. Fetch user's latest result for this exam
-          const { data: resultData, error: resultError } = await supabase
-            .from('results')
-            .select(`
+        const numericExamId = Number(examId);
+        if (isNaN(numericExamId)) {
+          setError('Mã đề thi không hợp lệ.');
+          return;
+        }
+
+        // 1. Fetch user's latest result for this exam
+        const { data: resultData, error: resultError } = await supabase
+          .from('results')
+          .select(`
+            id,
+            score,
+            exams (
+              title
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('exam_id', numericExamId)
+          .order('submitted_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (resultError) throw resultError;
+        
+        if (!resultData) {
+          setError('Bạn chưa thực hiện bài thi này, hoặc kết quả bài thi chưa được lưu.');
+          return;
+        }
+
+        setExamTitle(resultData.exams?.title || 'Kết quả bài thi');
+
+        // 2. Fetch user's detailed answers
+        const { data: userAnswers, error: answersError } = await supabase
+          .from('user_answers')
+          .select(`
+            question_id,
+            answer_id,
+            answers (
+              is_correct
+            )
+          `)
+          .eq('result_id', resultData.id);
+
+        if (answersError) throw answersError;
+
+        const answersMap: { [key: number]: number | null } = {};
+        userAnswers?.forEach((ua: any) => {
+          answersMap[ua.question_id] = ua.answer_id;
+        });
+        setUserAnswersMap(answersMap);
+
+        // 3. Fetch all questions and answers for this exam
+        const { data: examQuestions, error: eqError } = await supabase
+          .from('exam_questions')
+          .select(`
+            questions (
               id,
-              score,
-              exams (
-                title
-              )
-            `)
-            .eq('user_id', user.id)
-            .eq('exam_id', numericExamId)
-            .order('submitted_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (resultError) throw resultError;
-          
-          if (!resultData) {
-            setError('Bạn chưa thực hiện bài thi này, hoặc kết quả bài thi chưa được lưu.');
-            return;
-          }
-
-          setExamTitle(resultData.exams?.title || 'Kết quả bài thi');
-
-          // 2. Fetch user's detailed answers to count correct ones
-          const { data: userAnswers, error: answersError } = await supabase
-            .from('user_answers')
-            .select(`
-              answer_id,
+              content,
               answers (
+                id,
+                content,
                 is_correct
               )
-            `)
-            .eq('result_id', resultData.id);
+            )
+          `)
+          .eq('exam_id', numericExamId);
 
-          if (answersError) throw answersError;
+        if (eqError) throw eqError;
 
-          // 3. Fetch total questions count for this exam
-          const { data: examQuestions, error: eqError } = await supabase
-            .from('exam_questions')
-            .select('question_id')
-            .eq('exam_id', numericExamId);
+        const qs = (examQuestions || [])
+          .map((eq: any) => eq.questions)
+          .filter(Boolean);
+        
+        setQuestions(qs);
 
-          if (eqError) throw eqError;
+        const totalQuestions = qs.length;
+        const correctCount = userAnswers?.filter((ua: any) => ua.answers?.is_correct === true).length || 0;
 
-          const totalQuestions = examQuestions?.length || 0;
-          const correctCount = userAnswers?.filter((ua: any) => ua.answers?.is_correct === true).length || 0;
+        setResult({
+          score: resultData.score,
+          correctCount,
+          totalQuestions,
+        });
+      } catch (err: any) {
+        console.error('Lỗi khi tải chi tiết kết quả:', err);
+        setError('Không thể tải kết quả bài thi từ máy chủ.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-          setResult({
-            score: resultData.score,
-            correctCount,
-            totalQuestions,
-          });
-        } catch (err: any) {
-          console.error('Lỗi khi tải chi tiết kết quả:', err);
-          setError('Không thể tải kết quả bài thi từ máy chủ.');
-        } finally {
-          setLoading(false);
-        }
-      };
+    fetchResult();
+  }, [examId, user]);
 
-      fetchResult();
-    }
-  }, [location.state, examId, user]);
-
-  if (loading) {
+  if (loading && !result) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
         <CircularProgress size={50} style={{ color: 'rgb(22, 119, 185)' }} />
@@ -143,7 +171,7 @@ export default function ResultPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 700, mx: 'auto', mt: 6, p: 2 }}>
+    <Box sx={{ maxWidth: 800, mx: 'auto', mt: 6, p: 2 }}>
       <Paper elevation={4} sx={{ p: 5, borderRadius: 3, textAlign: 'center', border: '1px solid #e0e0e0', bgcolor: 'white' }}>
         <AssignmentTurnedIn sx={{ fontSize: 80, color: 'rgb(22, 119, 185)', mb: 2 }} />
 
@@ -218,6 +246,105 @@ export default function ResultPage() {
           </Button>
         </Box>
       </Paper>
+
+      {/* Answer review sheet section */}
+      {questions.length > 0 && (
+        <Box sx={{ mt: 5, mb: 6 }}>
+          <Typography variant="h5" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AssignmentTurnedIn color="primary" /> Chi tiết bài làm
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Xem lại các câu hỏi và so sánh câu trả lời của bạn với đáp án đúng.
+          </Typography>
+
+          {questions.map((question, index) => {
+            const studentChosenAnswerId = userAnswersMap[question.id];
+            
+            return (
+              <Paper key={question.id} variant="outlined" sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: 'white' }}>
+                <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'flex-start' }}>
+                  <Typography variant="subtitle1" fontWeight={600} color="primary" sx={{ whiteSpace: 'nowrap' }}>
+                    Câu {index + 1}:
+                  </Typography>
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    {question.content}
+                  </Typography>
+                </Box>
+
+                <Grid container spacing={2}>
+                  {question.answers?.map((ans: any) => {
+                    const isCorrectAnswer = ans.is_correct === true;
+                    const isStudentChosen = studentChosenAnswerId === ans.id;
+
+                    let cardBg = 'transparent';
+                    let borderCol = '#e0e0e0';
+                    let textColor = 'text.primary';
+
+                    if (isCorrectAnswer) {
+                      cardBg = '#e8f5e9'; // Light green for correct answer
+                      borderCol = '#4caf50';
+                    } else if (isStudentChosen && !isCorrectAnswer) {
+                      cardBg = '#ffebee'; // Light red for wrong answer chosen
+                      borderCol = '#f44336';
+                    }
+
+                    return (
+                      <Grid size={12} key={ans.id}>
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            bgcolor: cardBg,
+                            borderColor: borderCol,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ fontWeight: isStudentChosen || isCorrectAnswer ? 600 : 400 }}>
+                            {ans.content}
+                          </Typography>
+                          
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {isCorrectAnswer && (
+                              <Chip 
+                                icon={<CheckCircle style={{ color: 'white' }} />} 
+                                label="Đáp án đúng" 
+                                color="success" 
+                                size="small" 
+                                variant="filled" 
+                              />
+                            )}
+                            {isStudentChosen && !isCorrectAnswer && (
+                              <Chip 
+                                icon={<Cancel style={{ color: 'white' }} />} 
+                                label="Bạn chọn (Sai)" 
+                                color="error" 
+                                size="small" 
+                                variant="filled" 
+                              />
+                            )}
+                            {isStudentChosen && isCorrectAnswer && (
+                              <Chip 
+                                icon={<CheckCircle style={{ color: 'white' }} />} 
+                                label="Bạn chọn (Đúng)" 
+                                color="success" 
+                                size="small" 
+                                variant="outlined" 
+                              />
+                            )}
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </Paper>
+            );
+          })}
+        </Box>
+      )}
     </Box>
   );
 }
