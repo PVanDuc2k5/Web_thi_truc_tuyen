@@ -162,16 +162,10 @@ export default function ExamDetail() {
     setDetailOpen(true);
     setLoadingDetail(true);
     try {
-      // Fetch user answers
+      // Fetch user answers (avoid relationship cache joins)
       const { data: userAnswers, error: answersError } = await supabase
         .from('user_answers')
-        .select(`
-          question_id,
-          answer_id,
-          answers (
-            is_correct
-          )
-        `)
+        .select('question_id, answer_id')
         .eq('result_id', result.id);
 
       if (answersError) throw answersError;

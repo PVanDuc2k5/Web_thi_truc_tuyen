@@ -80,16 +80,10 @@ export default function ResultPage() {
 
         setExamTitle(resultData.exams?.title || 'Kết quả bài thi');
 
-        // 2. Fetch user's detailed answers
+        // 2. Fetch user's detailed answers (avoid relationship cache joins)
         const { data: userAnswers, error: answersError } = await supabase
           .from('user_answers')
-          .select(`
-            question_id,
-            answer_id,
-            answers (
-              is_correct
-            )
-          `)
+          .select('question_id, answer_id')
           .eq('result_id', resultData.id);
 
         if (answersError) throw answersError;
@@ -124,8 +118,24 @@ export default function ResultPage() {
         
         setQuestions(qs);
 
-        const totalQuestions = qs.length;
-        const correctCount = userAnswers?.filter((ua: any) => ua.answers?.is_correct === true).length || 0;
+        const totalQuestions = qs.length || userAnswers?.length || 0;
+
+        // Fetch correctness of chosen answers directly from the answers table
+        const chosenAnswerIds = (userAnswers || [])
+          .map((ua: any) => ua.answer_id)
+          .filter(Boolean);
+
+        let correctCount = 0;
+        if (chosenAnswerIds.length > 0) {
+          const { data: correctAnswers, error: correctAnswersError } = await supabase
+            .from('answers')
+            .select('id, is_correct')
+            .in('id', chosenAnswerIds);
+
+          if (!correctAnswersError && correctAnswers) {
+            correctCount = correctAnswers.filter((a: any) => a.is_correct === true).length;
+          }
+        }
 
         setResult({
           score: resultData.score,
