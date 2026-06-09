@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { useAuthStore } from '../../../lib/auth-store';
 import apiClient from '../../../lib/api-client';
-import { TextField, Button, Box, Typography, Card, CardContent, Container, Grow } from '@mui/material';
-import { School } from '@mui/icons-material';
+import { TextField, Button, Box, Typography, Card, CardContent, Container, Grow, CircularProgress } from '@mui/material';
+import { School, CheckCircleOutline } from '@mui/icons-material';
 import { toast } from 'sonner';
 
 
@@ -14,6 +14,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [userName, setUserName] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +46,8 @@ export default function Login() {
           username: profile.username,
         });
 
-        toast.success(`Welcome back, ${profile.username || user.email}! Redirecting...`);
+        setUserName(profile.username || user.email || '');
+        setSuccess(true);
 
         setTimeout(() => {
           if (profile.role === 'teacher') {
@@ -52,7 +55,7 @@ export default function Login() {
           } else {
             navigate('/student');
           }
-        }, 1200);
+        }, 2000);
       } catch (err) {
         setError('Failed to fetch user profile.');
         setLoading(false);
@@ -60,6 +63,37 @@ export default function Login() {
       }
     }
   };
+
+  if (success) {
+    return (
+      <Box 
+        sx={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          flexDirection: 'column',
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          textAlign: 'center',
+          p: 3
+        }}
+      >
+        <Grow in timeout={600}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <CheckCircleOutline sx={{ fontSize: 80, color: '#10b981', mb: 3 }} />
+            <Typography variant="h3" fontWeight={700} gutterBottom sx={{ letterSpacing: '-1px' }}>
+              Login Successful!
+            </Typography>
+            <Typography variant="h6" sx={{ opacity: 0.9, mb: 4, fontWeight: 400, maxWidth: 500 }}>
+              Welcome back, {userName}. We're redirecting you to your dashboard...
+            </Typography>
+            <CircularProgress color="inherit" size={28} />
+          </Box>
+        </Grow>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>

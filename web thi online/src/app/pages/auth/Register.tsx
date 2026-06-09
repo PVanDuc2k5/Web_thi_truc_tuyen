@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router';
 import { supabase } from '../../../lib/supabase';
 import { useAuthStore } from '../../../lib/auth-store';
 import apiClient from '../../../lib/api-client';
-import { TextField, Button, Box, Typography, Card, CardContent, Container, MenuItem, Grow } from '@mui/material';
-import { School } from '@mui/icons-material';
+import { TextField, Button, Box, Typography, Card, CardContent, Container, MenuItem, Grow, CircularProgress } from '@mui/material';
+import { School, CheckCircleOutline } from '@mui/icons-material';
 import { toast } from 'sonner';
 
 export default function Register() {
@@ -15,6 +15,8 @@ export default function Register() {
   const [role, setRole] = useState<'student' | 'teacher'>('student');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [registeredName, setRegisteredName] = useState('');
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +56,8 @@ export default function Register() {
             username: profile.username,
           });
 
-          toast.success(`Account created successfully! Welcome, ${profile.username}!`);
+          setRegisteredName(profile.username || '');
+          setSuccess(true);
 
           setTimeout(() => {
             if (profile.role === 'teacher') {
@@ -62,7 +65,7 @@ export default function Register() {
             } else {
               navigate('/student');
             }
-          }, 1200);
+          }, 2000);
         } else {
           setLoading(false);
         }
@@ -75,6 +78,37 @@ export default function Register() {
       setLoading(false);
     }
   };
+
+  if (success) {
+    return (
+      <Box 
+        sx={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          flexDirection: 'column',
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          textAlign: 'center',
+          p: 3
+        }}
+      >
+        <Grow in timeout={600}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <CheckCircleOutline sx={{ fontSize: 80, color: '#10b981', mb: 3 }} />
+            <Typography variant="h3" fontWeight={700} gutterBottom sx={{ letterSpacing: '-1px' }}>
+              Registration Successful!
+            </Typography>
+            <Typography variant="h6" sx={{ opacity: 0.9, mb: 4, fontWeight: 400, maxWidth: 500 }}>
+              Welcome, {registeredName}! We're preparing your workspace and redirecting you...
+            </Typography>
+            <CircularProgress color="inherit" size={28} />
+          </Box>
+        </Grow>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
