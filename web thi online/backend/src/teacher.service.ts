@@ -237,7 +237,7 @@ export class TeacherService {
         }
 
         const { error: resultError } = await this.supabase
-            .from('results') // đổi tên bảng nếu bảng của bạn không phải results
+            .from('results')
             .delete()
             .eq('exam_id', id);
 
