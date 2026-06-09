@@ -38,7 +38,9 @@ export default function Register() {
       const { data: signInData } = await supabase.auth.signInWithPassword({ email, password });
       
       if (signInData.session) {
-        const { data: profileData } = await apiClient.get('/auth/me');
+        const { data: profileData } = await apiClient.get('/auth/me', {
+          headers: { Authorization: `Bearer ${signInData.session.access_token}` }
+        });
         const { user } = signInData;
         const { profile } = profileData;
 

@@ -31,7 +31,9 @@ export default function Login() {
 
     if (data.user) {
       try {
-        const { data: profileData } = await apiClient.get('/auth/me');
+        const { data: profileData } = await apiClient.get('/auth/me', {
+          headers: { Authorization: `Bearer ${data.session!.access_token}` }
+        });
         const { user } = data;
         const { profile } = profileData;
 
