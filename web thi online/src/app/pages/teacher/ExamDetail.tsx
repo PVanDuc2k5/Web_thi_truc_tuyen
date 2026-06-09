@@ -27,8 +27,10 @@ import {
   MenuItem,
   CircularProgress,
 } from '@mui/material';
-import { ArrowBack, Edit, People, QuestionAnswer, Schedule, CheckCircle, ContentCopy, VpnKey } from '@mui/icons-material';
+import { ArrowBack, Edit, People, QuestionAnswer, Schedule, CheckCircle, ContentCopy, VpnKey, Visibility } from '@mui/icons-material';
 import { toast } from 'sonner';
+import { supabase } from '../../../lib/supabase';
+import { getExamResults } from '../../../lib/submission-service';
 
 interface ExamData {
   id: number;
@@ -69,6 +71,17 @@ export default function ExamDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState(emptyEditForm);
 
+  // States for student submissions
+  const [results, setResults] = useState<any[]>([]);
+  const [loadingResults, setLoadingResults] = useState(true);
+
+  // States for detailed submission preview
+  const [selectedResult, setSelectedResult] = useState<any>(null);
+  const [selectedAnswers, setSelectedAnswers] = useState<any[]>([]);
+  const [selectedQuestions, setSelectedQuestions] = useState<any[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+
   const fetchExam = async () => {
     if (!examId) return;
 
@@ -83,8 +96,24 @@ export default function ExamDetail() {
     }
   };
 
+  const fetchResults = async () => {
+    if (!examId) return;
+    setLoadingResults(true);
+    try {
+      const { data, error } = await getExamResults(Number(examId));
+      if (error) throw error;
+      setResults(data || []);
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách kết quả học sinh:', err);
+      toast.error('Không thể tải danh sách kết quả học sinh');
+    } finally {
+      setLoadingResults(false);
+    }
+  };
+
   useEffect(() => {
     void fetchExam();
+    void fetchResults();
   }, [examId]);
 
   const handleCopyCode = () => {
@@ -128,6 +157,54 @@ export default function ExamDetail() {
     }
   };
 
+  const handleViewDetails = async (result: any) => {
+    setSelectedResult(result);
+    setDetailOpen(true);
+    setLoadingDetail(true);
+    try {
+      // Fetch user answers
+      const { data: userAnswers, error: answersError } = await supabase
+        .from('user_answers')
+        .select(`
+          question_id,
+          answer_id,
+          answers (
+            is_correct
+          )
+        `)
+        .eq('result_id', result.id);
+
+      if (answersError) throw answersError;
+      setSelectedAnswers(userAnswers || []);
+
+      // Fetch questions for this exam
+      const { data: examQuestions, error: eqError } = await supabase
+        .from('exam_questions')
+        .select(`
+          questions (
+            id,
+            content,
+            answers (
+              id,
+              content,
+              is_correct
+            )
+          )
+        `)
+        .eq('exam_id', Number(examId));
+
+      if (eqError) throw eqError;
+
+      const qs = (examQuestions || []).map((eq: any) => eq.questions).filter(Boolean);
+      setSelectedQuestions(qs);
+    } catch (err) {
+      console.error(err);
+      toast.error('Không thể tải chi tiết bài làm');
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -162,7 +239,6 @@ export default function ExamDetail() {
           <Typography variant="h4" fontWeight={600}>
             {examData.title}
           </Typography>
-          {/* description removed (not stored in backend) */}
         </Box>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <Paper
@@ -291,6 +367,200 @@ export default function ExamDetail() {
         </CardContent>
       </Card>
 
+      {/* Student Submissions Card */}
+      <Card elevation={2} sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" fontWeight={600} gutterBottom>
+            Student Submissions
+          </Typography>
+          <Divider sx={{ my: 2 }} />
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }} align="center">Score</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Submitted Date</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }} align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loadingResults ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                      <CircularProgress size={30} />
+                    </TableCell>
+                  </TableRow>
+                ) : results.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                      <Typography variant="body1" color="text.secondary">
+                        Chưa có sinh viên nào nộp bài.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  results.map((result) => (
+                    <TableRow key={result.id} hover>
+                      <TableCell>{result.user_profiles?.username || 'Unknown Student'}</TableCell>
+                      <TableCell align="center">
+                        <strong>{result.score}/10</strong>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(result.submitted_at).toLocaleString('vi-VN')}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<Visibility />}
+                          onClick={() => handleViewDetails(result)}
+                        >
+                          View Answers
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
+
+      <Card elevation={2} sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" fontWeight={600} gutterBottom>
+            Questions in this Exam
+          </Typography>
+          <Divider sx={{ my: 2 }} />
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableCell sx={{ fontWeight: 600 }}>#</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Question</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {examData.questionList.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={2} align="center">
+                      No questions found
+                    </TableCell>
+                  </TableRow>
+                )}
+                {examData.questionList.map((q, index) => (
+                  <TableRow key={q.id} hover>
+                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{q.question}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
+
+      {/* Detailed Answers Review Dialog */}
+      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle sx={{ fontWeight: 600 }}>
+          Chi tiết bài làm - {selectedResult?.user_profiles?.username || 'Sinh viên'}
+        </DialogTitle>
+        <DialogContent dividers>
+          {loadingDetail ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+              <CircularProgress />
+            </Box>
+          ) : selectedQuestions.length === 0 ? (
+            <Typography align="center" color="text.secondary">Chưa tải được câu hỏi.</Typography>
+          ) : (
+            <Box>
+              <Box sx={{ display: 'flex', gap: 3, mb: 3 }}>
+                <Typography variant="subtitle1">
+                  Điểm số: <strong>{selectedResult?.score}/10</strong>
+                </Typography>
+              </Box>
+              <Divider sx={{ mb: 3 }} />
+              {selectedQuestions.map((question, index) => {
+                // Find student chosen answer
+                const studentAnswer = selectedAnswers.find((sa: any) => sa.question_id === question.id);
+                const chosenAnswerId = studentAnswer?.answer_id;
+
+                return (
+                  <Paper key={question.id} variant="outlined" sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: '#fbfbfb' }}>
+                    <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'flex-start' }}>
+                      <Typography variant="subtitle1" fontWeight={600} color="primary" sx={{ whiteSpace: 'nowrap' }}>
+                        Câu {index + 1}:
+                      </Typography>
+                      <Typography variant="subtitle1" fontWeight={600}>
+                        {question.content}
+                      </Typography>
+                    </Box>
+
+                    <Grid container spacing={1.5}>
+                      {question.answers?.map((ans: any) => {
+                        const isCorrectAnswer = ans.is_correct === true;
+                        const isChosen = chosenAnswerId === ans.id;
+
+                        let cardBg = 'transparent';
+                        let borderCol = '#e0e0e0';
+
+                        if (isCorrectAnswer) {
+                          cardBg = '#e8f5e9'; // Green background for correct
+                          borderCol = '#4caf50';
+                        } else if (isChosen && !isCorrectAnswer) {
+                          cardBg = '#ffebee'; // Red background for chosen incorrect
+                          borderCol = '#f44336';
+                        }
+
+                        return (
+                          <Grid size={12} key={ans.id}>
+                            <Paper
+                              variant="outlined"
+                              sx={{
+                                p: 1.5,
+                                borderRadius: 2,
+                                bgcolor: cardBg,
+                                borderColor: borderCol,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              <Typography variant="body2" sx={{ fontWeight: isChosen || isCorrectAnswer ? 600 : 400 }}>
+                                {ans.content}
+                              </Typography>
+                              
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                {isCorrectAnswer && (
+                                  <Chip label="Đáp án đúng" color="success" size="small" variant="filled" />
+                                )}
+                                {isChosen && !isCorrectAnswer && (
+                                  <Chip label="Học sinh chọn (Sai)" color="error" size="small" variant="filled" />
+                                )}
+                                {isChosen && isCorrectAnswer && (
+                                  <Chip label="Học sinh chọn (Đúng)" color="success" size="small" variant="outlined" />
+                                )}
+                              </Box>
+                            </Paper>
+                          </Grid>
+                        );
+                      })}
+                    </Grid>
+                  </Paper>
+                );
+              })}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailOpen(false)} variant="contained" sx={{ bgcolor: '#667eea' }}>
+            Đóng
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Edit Exam</DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
@@ -342,40 +612,6 @@ export default function ExamDetail() {
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Card elevation={2}>
-        <CardContent>
-          <Typography variant="h6" fontWeight={600} gutterBottom>
-            Questions in this Exam
-          </Typography>
-          <Divider sx={{ my: 2 }} />
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                  <TableCell fontWeight={600}>#</TableCell>
-                  <TableCell fontWeight={600}>Question</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {examData.questionList.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={2} align="center">
-                      No questions found
-                    </TableCell>
-                  </TableRow>
-                )}
-                {examData.questionList.map((q, index) => (
-                  <TableRow key={q.id} hover>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell>{q.question}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
     </Box>
   );
 }
