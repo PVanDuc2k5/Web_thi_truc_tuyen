@@ -212,6 +212,7 @@ export class TeacherService {
 
         return {
             message: 'Tạo đề thi thành công',
+            examCode,
         };
     }
 
