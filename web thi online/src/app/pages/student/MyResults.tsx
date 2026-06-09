@@ -17,7 +17,8 @@ import {
 import { Visibility } from '@mui/icons-material';
 
 // Import supabase client
-import { supabase } from '../../../lib/supabase'; // Đảm bảo đường dẫn này đúng với dự án của bạn
+import { supabase } from '../../../lib/supabase';
+import { useAuthStore } from '../../../lib/auth-store';
 
 // Định nghĩa kiểu dữ liệu để TypeScript không báo lỗi
 interface ResultData {
@@ -40,13 +41,11 @@ export default function MyResults() {
   useEffect(() => {
     const fetchMyResults = async () => {
       try {
-        const savedUser = localStorage.getItem('currentUser');
-        if (!savedUser || savedUser === 'undefined') {
+        const user = useAuthStore.getState().user;
+        if (!user || !user.id) {
           setLoading(false);
           return;
         }
-        
-        const currentUser = JSON.parse(savedUser);
 
         // Gọi DB: Lấy điểm từ bảng results, ĐỒNG THỜI join sang bảng exams để lấy tên đề thi
         const { data, error } = await supabase
@@ -61,7 +60,7 @@ export default function MyResults() {
               duration
             )
           `)
-          .eq('user_id', currentUser.id)
+          .eq('user_id', user.id)
           .order('submitted_at', { ascending: false }); // Sắp xếp bài mới nộp lên đầu
 
         if (error) {

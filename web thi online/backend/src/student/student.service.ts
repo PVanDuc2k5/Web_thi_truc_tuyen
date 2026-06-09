@@ -33,6 +33,18 @@ export class StudentService {
       throw new HttpException('Không tìm thấy đề thi', HttpStatus.NOT_FOUND);
     }
 
+    const now = new Date().getTime();
+    const startTime = data.start_time ? new Date(data.start_time).getTime() : 0;
+    const endTime = data.end_time ? new Date(data.end_time).getTime() : 0;
+
+    if (endTime && now > endTime) {
+      throw new HttpException('Bài thi đã kết thúc', HttpStatus.FORBIDDEN);
+    }
+
+    if (startTime && now < startTime) {
+      throw new HttpException('Chưa đến giờ làm bài', HttpStatus.FORBIDDEN);
+    }
+
     const formattedQuestions = data.exam_questions.map((eq: any) => ({
       id: eq.questions.id,
       content: eq.questions.content,

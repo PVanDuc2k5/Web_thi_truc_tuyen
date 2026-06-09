@@ -15,6 +15,10 @@ import {
   InputAdornment,
   Alert,
   Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { PlayArrow, CheckCircle, Schedule, Search, VpnKey, Add } from '@mui/icons-material';
 
@@ -34,68 +38,38 @@ interface Exam {
 export default function StudentDashboard() {
   const navigate = useNavigate();
   
-  // State khởi tạo bằng mảng rỗng, sẽ được lấp đầy khi gọi DB
-  const [examList, setExamList] = useState<Exam[]>([]);
-  
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [examCode, setExamCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [joinSuccess, setJoinSuccess] = useState('');
+  
+  // State for Waiting Room
+  const [waitingExam, setWaitingExam] = useState<{ id: number; title: string; startTime: string } | null>(null);
+  const [countdown, setCountdown] = useState<string>('');
 
-  // 🔄 KÉO DATA THẬT 100% TỪ SUPABASE
+  // Countdown logic for exams that haven't started
   useEffect(() => {
-    const fetchExamsAndStatus = async () => {
-      try {
-        const savedUser = localStorage.getItem('currentUser');
-        if (!savedUser || savedUser === 'undefined') return; 
-        
-        const currentUser = JSON.parse(savedUser);
-        if (!currentUser || !currentUser.id) return;
+    if (!waitingExam) return;
 
-        // 1. Kéo TOÀN BỘ danh sách đề thi từ bảng exams
-        const { data: examsData, error: examsError } = await supabase
-          .from('exams')
-          .select('*'); // Lấy id, title, duration...
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const startTime = new Date(waitingExam.startTime).getTime();
+      const distance = startTime - now;
 
-        if (examsError) {
-          console.error("Lỗi lấy danh sách đề thi:", examsError);
-          return;
-        }
-
-        // 2. Kéo danh sách ĐIỂM của học sinh này từ bảng results
-        const { data: resultsData, error: resultsError } = await supabase
-          .from('results')
-          .select('exam_id')
-          .eq('user_id', user.id);
-
-        if (resultsError) {
-          console.error("Lỗi lấy điểm:", resultsError);
-          return;
-        }
-
-        const safeResults = resultsData || [];
-        const completedExamIds = safeResults.map(result => Number(result.exam_id));
-
-        // 3. Lắp ghép 2 dữ liệu lại với nhau
-        const formattedExams = (examsData || []).map(exam => ({
-          id: exam.id,
-          title: exam.title,
-          // Nếu bảng exams của bạn chưa có cột số lượng câu hỏi, tạm để 50
-          questions: exam.total_questions || 50, 
-          duration: exam.duration,
-          status: completedExamIds.includes(exam.id) ? 'completed' : 'not_started'
-        }));
-
-        setExamList(formattedExams);
-
-      } catch (error) {
-        console.error('Lỗi ngầm trong useEffect:', error);
+      if (distance <= 0) {
+        clearInterval(timer);
+        setWaitingExam(null);
+        navigate(`/student/exam/${waitingExam.id}`);
+      } else {
+        const d = Math.floor(distance / (1000 * 60 * 60 * 24));
+        const h = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const s = Math.floor((distance % (1000 * 60)) / 1000);
+        setCountdown(`${d > 0 ? d + 'd ' : ''}${h}h ${m}m ${s}s`);
       }
-    };
+    }, 1000);
 
-    fetchExamsAndStatus();
-  }, []);
+    return () => clearInterval(timer);
+  }, [waitingExam, navigate]);
 
   // 🔍 TÍNH NĂNG NHẬP MÃ TÌM ĐỀ THI (REAL DATA)
   const handleJoinExam = async () => {
@@ -111,12 +85,27 @@ export default function StudentDashboard() {
       // Tìm đề thi có mã code tương ứng trong bảng exams
       const { data: exam, error } = await supabase
         .from('exams')
-        .select('id, title')
+        .select('id, title, start_time, end_time')
         .eq('code', examCode.toUpperCase())
         .single();
 
       if (error || !exam) {
         setJoinError('Mã đề thi không tồn tại. Vui lòng kiểm tra lại!');
+        return;
+      }
+
+      const now = new Date().getTime();
+      const startTime = exam.start_time ? new Date(exam.start_time).getTime() : 0;
+      const endTime = exam.end_time ? new Date(exam.end_time).getTime() : 0;
+
+      if (endTime && now > endTime) {
+        setJoinError('Bài thi đã kết thúc. Bạn không thể tham gia nữa!');
+        return;
+      }
+
+      if (startTime && now < startTime) {
+        setWaitingExam({ id: exam.id, title: exam.title, startTime: exam.start_time });
+        setExamCode('');
         return;
       }
 
@@ -131,64 +120,6 @@ export default function StudentDashboard() {
     } catch (err) {
       console.error('Lỗi khi tra mã:', err);
       setJoinError('Hệ thống đang bận, vui lòng thử lại sau.');
-    }
-  };
-
-  const filteredExams = examList
-    .filter(exam => {
-      if (filterStatus === 'all') return true;
-      return exam.status === filterStatus;
-    })
-    .filter(exam =>
-      exam.title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-  const getStatusChip = (status: string) => {
-    switch (status) {
-      case 'not_started':
-        return <Chip label="Not Started" color="default" size="small" />;
-      case 'in_progress':
-        return <Chip label="In Progress" color="warning" size="small" />;
-      case 'completed':
-        return <Chip label="Completed" color="success" size="small" />;
-      default:
-        return null;
-    }
-  };
-
-  const getActionButton = (exam: Exam) => {
-    if (exam.status === 'not_started') {
-      return (
-        <Button
-          variant="contained"
-          startIcon={<PlayArrow />}
-          onClick={() => navigate(`/student/exam/${exam.id}`)}
-          sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
-        >
-          Start Exam
-        </Button>
-      );
-    } else if (exam.status === 'in_progress') {
-      return (
-        <Button
-          variant="contained"
-          color="warning"
-          startIcon={<Schedule />}
-          onClick={() => navigate(`/student/exam/${exam.id}`)}
-        >
-          Continue
-        </Button>
-      );
-    } else {
-      return (
-        <Button
-          variant="outlined"
-          startIcon={<CheckCircle />}
-          onClick={() => navigate(`/student/result/${exam.id}`)}
-        >
-          View Result
-        </Button>
-      );
     }
   };
 
@@ -259,65 +190,25 @@ export default function StudentDashboard() {
         </Alert>
       )}
 
-      <Typography variant="h4" fontWeight={600} gutterBottom>
-        Available Exams
-      </Typography>
-
-      <Box sx={{ mt: 3, mb: 3 }}>
-        <Tabs
-          value={filterStatus}
-          onChange={(_, newValue) => setFilterStatus(newValue)}
-          sx={{ mb: 2 }}
-        >
-          <Tab key="all" label="All" value="all" />
-          <Tab key="not_started" label="Not Started" value="not_started" />
-          <Tab key="in_progress" label="In Progress" value="in_progress" />
-          <Tab key="completed" label="Completed" value="completed" />
-        </Tabs>
-
-        <TextField
-          fullWidth
-          placeholder="Search exams..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ bgcolor: 'white' }}
-        />
-      </Box>
-
-      <Grid container spacing={3}>
-        {filteredExams.map((exam) => (
-          <Grid size={{ xs: 12, md: 6 }} key={exam.id}>
-            <Card elevation={2}>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                  <Typography variant="h6" fontWeight={600}>
-                    {exam.title}
-                  </Typography>
-                  {getStatusChip(exam.status)}
-                </Box>
-                <Box sx={{ display: 'flex', gap: 3, mt: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Questions:</strong> {exam.questions}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Duration:</strong> {exam.duration} min
-                  </Typography>
-                </Box>
-              </CardContent>
-              <CardActions sx={{ p: 2, pt: 0 }}>
-                {getActionButton(exam)}
-              </CardActions>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+      {/* Waiting Room Modal */}
+      <Dialog open={!!waitingExam} onClose={() => setWaitingExam(null)}>
+        <DialogTitle sx={{ textAlign: 'center', fontWeight: 'bold' }}>Phòng Chờ Thi</DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', p: 4, minWidth: 350 }}>
+          <Schedule sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+          <Typography variant="h6" gutterBottom>{waitingExam?.title}</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Chưa đến giờ làm bài. Bài thi sẽ tự động bắt đầu khi đồng hồ đếm ngược kết thúc.
+          </Typography>
+          <Box sx={{ bgcolor: '#f5f5f5', p: 2, borderRadius: 2 }}>
+            <Typography variant="h3" fontWeight={700} color="primary" sx={{ fontFamily: 'monospace' }}>
+              {countdown}
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+          <Button variant="outlined" onClick={() => setWaitingExam(null)}>Thoát</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

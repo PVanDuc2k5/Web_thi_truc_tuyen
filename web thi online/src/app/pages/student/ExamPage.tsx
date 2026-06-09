@@ -49,15 +49,14 @@ export default function ExamPage() {
     const fetchExamData = async () => {
       try {
         // --- BẮT ĐẦU ĐOẠN KIỂM TRA BẢO MẬT ---
-        const savedUser = localStorage.getItem('currentUser');
-        const currentUser = savedUser ? JSON.parse(savedUser) : null;
+        const user = useAuthStore.getState().user;
         
-        if (currentUser) {
+        if (user) {
           // Check xem trong DB có điểm của người này cho đề này chưa
           const { data: existingResult, error: checkError } = await supabase
             .from('results')
             .select('id')
-            .eq('user_id', currentUser.id)
+            .eq('user_id', user.id)
             .eq('exam_id', safeExamId)
             .single(); // Tìm 1 kết quả duy nhất
 
@@ -71,10 +70,8 @@ export default function ExamPage() {
         // --- KẾT THÚC ĐOẠN KIỂM TRA BẢO MẬT ---
 
         // Nếu chưa thi thì tiếp tục gọi Backend lấy đề thi
-        const response = await fetch(`http://localhost:3001/student/exam/${safeExamId}`);
-        if (!response.ok) throw new Error('Không tìm thấy đề thi (DB trống)');
+        const { data } = await apiClient.get(`/student/exam/${safeExamId}`);
         
-        const data = await response.json();
         setExam(data.exam);
         setQuestions(data.questions);
 
@@ -137,17 +134,14 @@ export default function ExamPage() {
     if (!exam || isSubmitting) return;
 
     // Lấy thông tin user từ Zustand auth store
+    const user = useAuthStore.getState().user;
     if (!user) {
       alert('Lỗi: Không tìm thấy thông tin sinh viên. Vui lòng quay lại trang Đăng nhập!');
       navigate('/');
       return;
     }
     
-    // Nếu còn thời gian thì hỏi lại, hết giờ thì ép nộp luôn
-    if (timeLeft > 0) {
-      const isConfirm = window.confirm('Bạn có chắc chắn muốn nộp bài?');
-      if (!isConfirm) return;
-    }
+    // Bỏ qua bước confirm để nộp bài ngay lập tức
 
     setIsSubmitting(true);
     try {
@@ -157,7 +151,7 @@ export default function ExamPage() {
       }));
 
       const payload = {
-        userId: currentUser.id,
+        userId: user.id,
         examId: exam.id,
         answers: answersPayload
       };
@@ -196,9 +190,16 @@ export default function ExamPage() {
           Số câu đúng: <strong>{result.correctCount} / {result.totalQuestions}</strong>
         </Typography>
         <Typography variant="body1" color="text.secondary">Điểm tổng kết:</Typography>
-        <Typography variant="h1" fontWeight={900} sx={{ color: 'rgb(22, 119, 185)', mt: 1 }}>
+        <Typography variant="h1" fontWeight={900} sx={{ color: 'rgb(22, 119, 185)', mt: 1, mb: 4 }}>
           {result.score}
         </Typography>
+        <Button 
+          variant="contained" 
+          onClick={() => navigate('/student')} 
+          sx={{ backgroundColor: 'rgb(22, 119, 185)', '&:hover': { backgroundColor: 'rgb(18, 95, 148)' }, px: 4, py: 1.5, fontSize: '1.1rem', borderRadius: 2 }}
+        >
+          Quay lại trang chủ
+        </Button>
       </Box>
     );
   }
