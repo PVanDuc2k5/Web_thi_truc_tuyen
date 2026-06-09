@@ -13,7 +13,7 @@ import {
   Chip,
   Divider,
 } from '@mui/material';
-import { Home, Replay, AssignmentTurnedIn, CheckCircle, Cancel } from '@mui/icons-material';
+import { Home, AssignmentTurnedIn, CheckCircle, Cancel } from '@mui/icons-material';
 import { supabase } from '../../../lib/supabase';
 import { useAuthStore } from '../../../lib/auth-store';
 
@@ -236,7 +236,7 @@ export default function ResultPage() {
           Tổng số câu: <strong>{result.totalQuestions}</strong>
         </Typography>
 
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           <Button
             variant="contained"
             startIcon={<Home />}
@@ -244,15 +244,6 @@ export default function ResultPage() {
             sx={{ bgcolor: 'rgb(22, 119, 185)', px: 4, py: 1.5, borderRadius: 2 }}
           >
             Về Trang Chủ
-          </Button>
-
-          <Button
-            variant="outlined"
-            startIcon={<Replay />}
-            onClick={() => navigate(`/student/exam/${examId}`)}
-            sx={{ color: 'rgb(22, 119, 185)', borderColor: 'rgb(22, 119, 185)', px: 4, py: 1.5, borderRadius: 2 }}
-          >
-            Thi Lại
           </Button>
         </Box>
       </Paper>
