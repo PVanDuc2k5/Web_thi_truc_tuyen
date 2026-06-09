@@ -14,10 +14,11 @@ CREATE TABLE public.user_profiles (
 -- Bật Row Level Security
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 
--- Chính sách: Người dùng có thể đọc profile của chính mình
-CREATE POLICY "Users can read own profile" ON public.user_profiles
+-- Chính sách: Tất cả người dùng đã đăng nhập có thể xem profiles (giúp giáo viên xem thông tin sinh viên)
+CREATE POLICY "Allow authenticated users to read profiles" ON public.user_profiles
     FOR SELECT
-    USING (auth.uid() = user_id);
+    TO authenticated
+    USING (true);
 
 -- Chính sách: Người dùng có thể cập nhật profile của chính mình
 CREATE POLICY "Users can update own profile" ON public.user_profiles
