@@ -18,22 +18,23 @@ import {
 } from '@mui/material';
 import { PlayArrow, CheckCircle, Schedule, Search, VpnKey, Add } from '@mui/icons-material';
 
-// Import supabase từ thư mục lib (Đường dẫn lùi 3 cấp ra ngoài src)
+// Import supabase từ thư mục lib
 import { supabase } from '../../../lib/supabase';
 
-// Chuyển mảng dữ liệu này thành mảng khởi tạo tĩnh
-const initialExams = [
-  { id: 1, title: 'Mathematics Final Exam', questions: 50, duration: 90, status: 'not_started' },
-  { id: 2, title: 'Physics Midterm', questions: 30, duration: 60, status: 'not_started' },
-  { id: 3, title: 'Chemistry Quiz 1', questions: 20, duration: 30, status: 'not_started' },
-  { id: 4, title: 'Biology Practice Test', questions: 40, duration: 75, status: 'not_started' },
-];
+// Khai báo kiểu dữ liệu cho Exam để code không báo lỗi
+interface Exam {
+  id: number;
+  title: string;
+  questions: number;
+  duration: number;
+  status: string;
+}
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
   
-  // Đưa mảng exams vào state để có thể cập nhật trạng thái động
-  const [examList, setExamList] = useState(initialExams);
+  // State khởi tạo bằng mảng rỗng, sẽ được lấp đầy khi gọi DB
+  const [examList, setExamList] = useState<Exam[]>([]);
   
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,71 +42,97 @@ export default function StudentDashboard() {
   const [joinError, setJoinError] = useState('');
   const [joinSuccess, setJoinSuccess] = useState('');
 
-  // 🚀 MA THUẬT NẰM Ở ĐÂY: Hàm gọi dữ liệu thật từ Database
+  // 🔄 KÉO DATA THẬT 100% TỪ SUPABASE
   useEffect(() => {
-    const fetchExamStatus = async () => {
+    const fetchExamsAndStatus = async () => {
       try {
-        // 1. Lấy và kiểm tra thẻ sinh viên cực kỳ cẩn thận
         const savedUser = localStorage.getItem('currentUser');
         if (!savedUser || savedUser === 'undefined') return; 
         
         const currentUser = JSON.parse(savedUser);
-        if (!currentUser || !currentUser.id) return; // Nếu không có ID thì dừng luôn
+        if (!currentUser || !currentUser.id) return;
 
-        // 2. Kéo dữ liệu từ DB
-        const { data: results, error } = await supabase
+        // 1. Kéo TOÀN BỘ danh sách đề thi từ bảng exams
+        const { data: examsData, error: examsError } = await supabase
+          .from('exams')
+          .select('*'); // Lấy id, title, duration...
+
+        if (examsError) {
+          console.error("Lỗi lấy danh sách đề thi:", examsError);
+          return;
+        }
+
+        // 2. Kéo danh sách ĐIỂM của học sinh này từ bảng results
+        const { data: resultsData, error: resultsError } = await supabase
           .from('results')
           .select('exam_id')
           .eq('user_id', currentUser.id);
 
-        if (error) {
-          console.error("Supabase báo lỗi:", error);
-          return; // Có lỗi thì dừng, không cho crash
+        if (resultsError) {
+          console.error("Lỗi lấy điểm:", resultsError);
+          return;
         }
 
-        // 🟢 BẢO VỆ CHỐNG TRẮNG TRANG: Đảm bảo results luôn là mảng, dù DB trả về null
-        const safeResults = results || [];
-        console.log("Dữ liệu điểm kéo từ Supabase:", safeResults);
-
+        const safeResults = resultsData || [];
         const completedExamIds = safeResults.map(result => Number(result.exam_id));
 
-        // Cập nhật giao diện
-        setExamList(prevExams => 
-          prevExams.map(exam => ({
-            ...exam,
-            status: completedExamIds.includes(exam.id) ? 'completed' : 'not_started'
-          }))
-        );
+        // 3. Lắp ghép 2 dữ liệu lại với nhau
+        const formattedExams = (examsData || []).map(exam => ({
+          id: exam.id,
+          title: exam.title,
+          // Nếu bảng exams của bạn chưa có cột số lượng câu hỏi, tạm để 50
+          questions: exam.total_questions || 50, 
+          duration: exam.duration,
+          status: completedExamIds.includes(exam.id) ? 'completed' : 'not_started'
+        }));
+
+        setExamList(formattedExams);
+
       } catch (error) {
-        // Bắt mọi lỗi lặt vặt khác để không bị trắng trang
         console.error('Lỗi ngầm trong useEffect:', error);
       }
     };
 
-    fetchExamStatus();
+    fetchExamsAndStatus();
   }, []);
 
-  const handleJoinExam = () => {
+  // 🔍 TÍNH NĂNG NHẬP MÃ TÌM ĐỀ THI (REAL DATA)
+  const handleJoinExam = async () => {
     setJoinError('');
     setJoinSuccess('');
 
     if (!examCode.trim()) {
-      setJoinError('Please enter an exam code');
+      setJoinError('Vui lòng nhập mã đề thi!');
       return;
     }
 
-    // Simulate exam code validation
-    const validCodes = ['MATH2024', 'PHY2024', 'CHEM2024'];
-    if (validCodes.includes(examCode.toUpperCase())) {
-      setJoinSuccess(`Successfully joined exam! The exam has been added to your available exams.`);
+    try {
+      // Tìm đề thi có mã code tương ứng trong bảng exams
+      const { data: exam, error } = await supabase
+        .from('exams')
+        .select('id, title')
+        .eq('code', examCode.toUpperCase())
+        .single();
+
+      if (error || !exam) {
+        setJoinError('Mã đề thi không tồn tại. Vui lòng kiểm tra lại!');
+        return;
+      }
+
+      setJoinSuccess(`Đã tìm thấy: ${exam.title}! Đang chuyển vào phòng thi...`);
       setExamCode('');
-      setTimeout(() => setJoinSuccess(''), 5000);
-    } else {
-      setJoinError('Invalid exam code. Please check and try again.');
+      
+      // Chuyển hướng sau 1.5 giây
+      setTimeout(() => {
+        navigate(`/student/exam/${exam.id}`);
+      }, 1500);
+
+    } catch (err) {
+      console.error('Lỗi khi tra mã:', err);
+      setJoinError('Hệ thống đang bận, vui lòng thử lại sau.');
     }
   };
 
-  // 🔄 Cập nhật mảng được lọc (Dùng state examList thay cho biến exams cũ)
   const filteredExams = examList
     .filter(exam => {
       if (filterStatus === 'all') return true;
@@ -128,7 +155,7 @@ export default function StudentDashboard() {
     }
   };
 
-  const getActionButton = (exam: typeof initialExams[0]) => {
+  const getActionButton = (exam: Exam) => {
     if (exam.status === 'not_started') {
       return (
         <Button
